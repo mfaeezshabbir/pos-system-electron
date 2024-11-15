@@ -12,28 +12,30 @@ const currencies = [
 
 // Currency formatter
 export const formatCurrency = (amount) => {
-  const { currencyCode, currencySymbol } = useSettingsStore.getState().posSettings
-  const numberFormat = new Intl.NumberFormat('en-US', {
-    style: 'decimal',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-  
-  return `${currencySymbol} ${numberFormat.format(amount)}`
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'PKR'
+  }).format(amount);
 }
 
 // Date formatter
 export const formatDate = (date) => {
-  const { dateFormat } = useSettingsStore.getState().systemSettings
-  return format(new Date(date), dateFormat)
+  try {
+    return format(new Date(date), 'MM/dd/yyyy');
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'Invalid Date';
+  }
 }
 
 // Time formatter
 export const formatTime = (date) => {
-  const { timeFormat } = useSettingsStore.getState().systemSettings
-  const format24 = "HH:mm"
-  const format12 = "hh:mm a"
-  return format(new Date(date), timeFormat === '24h' ? format24 : format12)
+  try {
+    return format(new Date(date), 'HH:mm:ss');
+  } catch (error) {
+    console.error('Time formatting error:', error);
+    return 'Invalid Time';
+  }
 }
 
 // Format phone number

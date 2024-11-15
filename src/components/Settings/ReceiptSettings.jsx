@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react";
 import {
   Grid,
   TextField,
@@ -6,33 +6,33 @@ import {
   FormControlLabel,
   Button,
   Typography,
-  Slider
-} from '@mui/material'
-import useSettingsStore from '../../stores/useSettingsStore'
+  Slider,
+} from "@mui/material";
+import useSettingsStore from "../../stores/useSettingsStore";
 
 const ReceiptSettings = () => {
-  const { receiptSettings, updateReceiptSettings } = useSettingsStore()
-  const [formData, setFormData] = React.useState(receiptSettings)
+  const { receiptSettings, updateReceiptSettings } = useSettingsStore();
+  const [formData, setFormData] = React.useState(receiptSettings);
 
   const handleChange = (e) => {
-    const { name, value, checked } = e.target
-    setFormData(prev => ({
+    const { name, value, checked } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: e.target.type === 'checkbox' ? checked : value
-    }))
-  }
+      [name]: e.target.type === "checkbox" ? checked : value,
+    }));
+  };
 
   const handleFontSizeChange = (event, newValue) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      fontSize: newValue
-    }))
-  }
+      fontSize: newValue,
+    }));
+  };
 
   const handleSubmit = (e) => {
-    e.preventDefault()
-    updateReceiptSettings(formData)
-  }
+    e.preventDefault();
+    updateReceiptSettings(formData);
+  };
 
   return (
     <form onSubmit={handleSubmit}>
@@ -134,7 +134,7 @@ const ReceiptSettings = () => {
         </Grid>
       </Grid>
     </form>
-  )
-}
+  );
+};
 
-export default ReceiptSettings 
+export default ReceiptSettings;

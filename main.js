@@ -66,10 +66,31 @@ app.on('activate', () => {
 })
 
 // IPC Handlers
-ipcMain.handle('print-receipt', async (event, receiptData) => {
+ipcMain.handle('print-receipt', async (event, { data, options }) => {
   try {
     const printer = mainWindow.webContents.getPrinter()
-    // Implement printer logic
+    
+    if (!printer) {
+      throw new Error('No printer found')
+    }
+
+    // Create a temporary window to print from
+    const printWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        nodeIntegration: true
+      }
+    })
+
+    // Load the receipt data
+    await printWindow.loadURL(`data:application/pdf;base64,${Buffer.from(data).toString('base64')}`)
+
+    // Print the receipt
+    const result = await printWindow.webContents.print(options)
+    
+    // Close the temporary window
+    printWindow.close()
+
     return { success: true }
   } catch (error) {
     console.error('Printing error:', error)

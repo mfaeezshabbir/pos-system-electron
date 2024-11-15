@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import dayjs from 'dayjs'
+import useTransactionStore from './useTransactionStore'
 import { DEFAULT_PRODUCT_IMAGE } from '../utils/constants'
 
 const validateProduct = (product) => {
@@ -180,7 +182,32 @@ const useInventoryStore = create(
       getItem: (productId) => {
         const state = get()
         return state.products.find(product => product.id === productId)
-      }
+      },
+
+      // Add this method to your store
+      getProductCountByDate: async (date) => {
+        try {
+          const transactionStore = useTransactionStore.getState();
+          const transactions = await transactionStore.getTransactionsByDateRange(
+            dayjs(date).startOf('day'),
+            dayjs(date).endOf('day')
+          );
+
+          // Calculate product count based on transactions before given date
+          const productChanges = transactions.reduce((acc, transaction) => {
+            transaction.items.forEach(item => {
+              if (!acc[item.id]) acc[item.id] = 0;
+              acc[item.id] += item.quantity;
+            });
+            return acc;
+          }, {});
+
+          return Object.keys(productChanges).length;
+        } catch (error) {
+          console.error('Failed to get historical product count:', error);
+          return 0;
+        }
+      },
     }),
     {
       name: 'inventory-store',

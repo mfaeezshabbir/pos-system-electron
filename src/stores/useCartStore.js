@@ -5,6 +5,7 @@ import useAuthStore from './useAuthStore'
 import useTransactionStore from './useTransactionStore'
 import useCustomerStore from './useCustomerStore'
 import useNotificationStore from './useNotificationStore'
+import { safeGetItem, safeSetItem } from '../utils/storage'
 
 const useCartStore = create(
   persist(
@@ -137,17 +138,25 @@ const useCartStore = create(
 
       // Complete transaction
       completeTransaction: async (paymentDetails) => {
-        const state = get()
+        const state = get();
         if (state.items.length === 0) {
-          set({ error: 'Cart is empty' })
-          return false
+          set({ error: 'Cart is empty' });
+          return false;
         }
 
-        const totals = state.getCartTotals()
+        const totals = state.getCartTotals();
+        
+        // Create minimal transaction data
         const transactionData = {
           id: Date.now().toString(),
           timestamp: new Date().toISOString(),
-          items: state.items,
+          items: state.items.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.quantity * item.price
+          })),
           customerId: state.customer?.id,
           customerName: state.customer?.name,
           paymentMethod: paymentDetails.method,
@@ -157,39 +166,39 @@ const useCartStore = create(
           total: totals.total,
           status: paymentDetails.method === 'khata' ? 'pending' : 'completed',
           cashierId: useAuthStore.getState().currentUser.id
-        }
+        };
 
         try {
           if (paymentDetails.method === 'khata') {
             if (!state.customer) {
-              set({ error: 'Please select a customer for khata payment' })
-              return false
+              set({ error: 'Please select a customer for khata payment' });
+              return false;
             }
 
             // Add to pending payments
-            const customerStore = useCustomerStore.getState()
+            const customerStore = useCustomerStore.getState();
             const success = customerStore.addPendingPayment(
               state.customer.id,
               {
                 ...transactionData,
-                dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+                dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
               }
-            )
+            );
 
             if (!success) {
-              set({ error: 'Credit limit exceeded' })
-              return false
+              set({ error: 'Credit limit exceeded' });
+              return false;
             }
           }
 
           // Update inventory
-          const inventory = useInventoryStore.getState()
+          const inventory = useInventoryStore.getState();
           state.items.forEach(item => {
-            inventory.updateStock(item.id, item.quantity, 'subtract')
-          })
+            inventory.updateStock(item.id, item.quantity, 'subtract');
+          });
 
           // Add transaction to store
-          useTransactionStore.getState().addTransaction(transactionData)
+          useTransactionStore.getState().addTransaction(transactionData);
 
           // Clear cart
           set({
@@ -198,12 +207,12 @@ const useCartStore = create(
             discount: 0,
             tax: 0,
             error: null
-          })
+          });
 
-          return true
+          return true;
         } catch (error) {
-          set({ error: error.message })
-          return false
+          set({ error: error.message });
+          return false;
         }
       },
 
@@ -255,6 +264,39 @@ const useCartStore = create(
         })
 
         return true
+      },
+
+      cleanupOldTransactions: () => {
+        try {
+          const transactions = JSON.parse(localStorage.getItem('transaction-storage') || '[]');
+          // Keep only last 100 transactions or transactions from last 30 days
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          const filteredTransactions = transactions
+            .filter(t => new Date(t.timestamp) > thirtyDaysAgo)
+            .slice(-100);
+          localStorage.setItem('transaction-storage', JSON.stringify(filteredTransactions));
+        } catch (error) {
+          console.error('Failed to cleanup transactions:', error);
+        }
+      },
+
+      addTransaction: (transaction) => {
+        try {
+          const currentPage = localStorage.getItem('current-transaction-page') || '1';
+          const pageKey = `transactions-page-${currentPage}`;
+          const transactions = JSON.parse(localStorage.getItem(pageKey) || '[]');
+          
+          if (transactions.length >= 50) { // Max 50 transactions per page
+            const newPage = parseInt(currentPage) + 1;
+            localStorage.setItem('current-transaction-page', newPage.toString());
+            localStorage.setItem(`transactions-page-${newPage}`, JSON.stringify([transaction]));
+          } else {
+            transactions.push(transaction);
+            localStorage.setItem(pageKey, JSON.stringify(transactions));
+          }
+        } catch (error) {
+          console.error('Failed to store transaction:', error);
+        }
       }
     }),
     {

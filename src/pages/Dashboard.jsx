@@ -1,147 +1,323 @@
-import React from 'react'
-import { 
-  Grid, 
-  Paper, 
-  Typography, 
+import React from "react";
+import {
+  Grid,
+  Paper,
+  Typography,
   Box,
   Card,
   CardContent,
-  LinearProgress
-} from '@mui/material'
+  Stack,
+  Divider,
+  Avatar,
+  IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemAvatar,
+  Tooltip,
+} from "@mui/material";
 import {
   TrendingUp,
   Inventory,
   ShoppingCart,
-  Warning
-} from '@mui/icons-material'
-import useTransactionStore from '../stores/useTransactionStore'
-import useInventoryStore from '../stores/useInventoryStore'
-import { formatCurrency } from '../utils/formatters'
-import useAuthStore, { ROLES } from '../stores/useAuthStore'
-import useDashboardStore from '../stores/useDashboardStore'
+  Warning,
+  MoreVert,
+  ArrowUpward,
+  ArrowDownward,
+} from "@mui/icons-material";
+import useTransactionStore from "../stores/useTransactionStore";
+import useInventoryStore from "../stores/useInventoryStore";
+import { formatCurrency } from "../utils/formatters";
+import useAuthStore, { ROLES } from "../stores/useAuthStore";
+import useDashboardStore from "../stores/useDashboardStore";
+import dayjs from "dayjs";
 
-const DashboardCard = ({ title, value, icon, color }) => (
-  <Card>
+const StatCard = ({
+  title,
+  value,
+  subtitle,
+  icon,
+  trend,
+  color = "primary",
+}) => (
+  <Card
+    elevation={2}
+    sx={{
+      bgcolor: "background.paper",
+      borderRadius: 2,
+      transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+      "&:hover": {
+        transform: "translateY(-4px)",
+        boxShadow: 4,
+      },
+    }}
+  >
     <CardContent>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Typography color="textSecondary" variant="h6">
-          {title}
-        </Typography>
-        {icon}
-      </Box>
-      <Typography variant="h4">{value}</Typography>
+      <Stack spacing={2}>
+        <Stack direction="row" alignItems="center" spacing={2}>
+          <Avatar
+            sx={{
+              bgcolor: `${color}.light`,
+              color: `${color}.main`,
+              p: 2,
+              boxShadow: 1,
+            }}
+          >
+            {icon}
+          </Avatar>
+          <Box flex={1}>
+            <Typography variant="h5" fontWeight="bold" gutterBottom>
+              {value}
+            </Typography>
+            <Typography
+              variant="subtitle1"
+              color="text.secondary"
+              sx={{ fontWeight: 500 }}
+            >
+              {title}
+            </Typography>
+          </Box>
+        </Stack>
+
+        {trend && (
+          <Box>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{
+                bgcolor: trend > 0 ? "success.lighter" : "error.lighter",
+                color: trend > 0 ? "success.dark" : "error.dark",
+                py: 0.5,
+                px: 1,
+                borderRadius: 1,
+                width: "fit-content",
+              }}
+            >
+              {trend > 0 ? (
+                <ArrowUpward fontSize="small" />
+              ) : (
+                <ArrowDownward fontSize="small" />
+              )}
+              <Typography variant="body2" fontWeight="medium">
+                {Math.abs(trend)}%
+              </Typography>
+            </Stack>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 0.5 }}
+            >
+              vs last month
+            </Typography>
+          </Box>
+        )}
+      </Stack>
     </CardContent>
   </Card>
-)
+);
 
 const Dashboard = () => {
-  const { currentUser } = useAuthStore()
-  const { todaySales, todayTransactions, recentTransactions } = useDashboardStore()
-  const { products, getLowStockProducts } = useInventoryStore()
-  
-  const lowStockItems = getLowStockProducts()
-  const isCashier = currentUser?.role === ROLES.CASHIER
+  const { currentUser } = useAuthStore();
+  const { todaySales, todayTransactions, updateSalesData } =
+    useDashboardStore();
+  const { products, getLowStockProducts } = useInventoryStore();
+  const [recentTransactions, setRecentTransactions] = React.useState([]);
+  const [trends, setTrends] = React.useState({
+    sales: 0,
+    products: 0,
+    transactions: 0,
+  });
+  const [loading, setLoading] = React.useState(true);
 
-  // Reset daily stats at midnight
+  const lowStockItems = getLowStockProducts();
+  const isCashier = currentUser?.role === ROLES.CASHIER;
+
+  // Calculate trends
   React.useEffect(() => {
-    const now = new Date()
-    const tomorrow = new Date(now)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    tomorrow.setHours(0, 0, 0, 0)
-    
-    const timeUntilMidnight = tomorrow - now
-    
-    const timer = setTimeout(() => {
-      useDashboardStore.getState().resetDailyStats()
-    }, timeUntilMidnight)
+    const calculateTrends = async () => {
+      const transactionStore = useTransactionStore.getState();
+      const today = dayjs();
+      const lastMonth = today.subtract(1, "month");
 
-    return () => clearTimeout(timer)
-  }, [])
+      // Get current month's data
+      const currentMonthData = transactionStore.getSalesSummary(
+        today.startOf("month"),
+        today.endOf("month")
+      );
+
+      // Get last month's data
+      const lastMonthData = transactionStore.getSalesSummary(
+        lastMonth.startOf("month"),
+        lastMonth.endOf("month")
+      );
+
+      // Calculate trends
+      const salesTrend =
+        lastMonthData.totalRevenue === 0
+          ? 100
+          : ((currentMonthData.totalRevenue - lastMonthData.totalRevenue) /
+              lastMonthData.totalRevenue) *
+            100;
+
+      const transactionsTrend =
+        lastMonthData.transactionCount === 0
+          ? 100
+          : ((currentMonthData.transactionCount -
+              lastMonthData.transactionCount) /
+              lastMonthData.transactionCount) *
+            100;
+
+      // Calculate product trend (based on total products vs last month)
+      const previousProducts = await useInventoryStore
+        .getState()
+        .getProductCountByDate(lastMonth.endOf("month"));
+      const currentProducts = products.length;
+      const productsTrend =
+        previousProducts === 0
+          ? 100
+          : ((currentProducts - previousProducts) / previousProducts) * 100;
+
+      setTrends({
+        sales: Math.round(salesTrend),
+        products: Math.round(productsTrend),
+        transactions: Math.round(transactionsTrend),
+      });
+    };
+
+    calculateTrends();
+  }, [products]);
+
+  React.useEffect(() => {
+    const unsubscribe = useTransactionStore.subscribe((state, prevState) => {
+      if (state.transactions.length !== prevState.transactions.length) {
+        const newTransaction = state.transactions[0];
+        if (newTransaction) {
+          updateSalesData(newTransaction);
+          setRecentTransactions((prev) =>
+            [newTransaction, ...prev].slice(0, 5)
+          );
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  React.useEffect(() => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    const timeUntilMidnight = tomorrow - now;
+
+    const timer = setTimeout(() => {
+      useDashboardStore.getState().resetDailyStats();
+    }, timeUntilMidnight);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
-    <Box>
-      <Typography variant="h4" sx={{ mb: 4 }}>Dashboard</Typography>
-      
+    <Box sx={{ p: 3 }}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={4}
+      >
+        <Typography variant="h4" fontWeight="bold">
+          Dashboard
+        </Typography>
+        <IconButton>
+          <MoreVert />
+        </IconButton>
+      </Stack>
+
       <Grid container spacing={3}>
-        {/* Sales Summary - Only visible to admin and manager */}
         {!isCashier && (
-          <Grid item xs={12} md={3}>
-            <DashboardCard
+          <Grid item xs={12} sm={6} md={3}>
+            <StatCard
               title="Today's Sales"
               value={formatCurrency(todaySales)}
-              icon={<TrendingUp color="primary" />}
+              icon={<TrendingUp />}
+              trend={trends.sales}
+              color="primary"
             />
           </Grid>
         )}
 
-        <Grid item xs={12} md={3}>
-          <DashboardCard
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
             title="Total Products"
             value={products.length}
-            icon={<Inventory color="secondary" />}
+            icon={<Inventory />}
+            trend={trends.products}
+            color="secondary"
           />
         </Grid>
 
         {!isCashier && (
-          <Grid item xs={12} md={3}>
-            <DashboardCard
+          <Grid item xs={12} sm={6} md={3}>
+            <StatCard
               title="Today's Transactions"
               value={todayTransactions}
-              icon={<ShoppingCart color="success" />}
+              icon={<ShoppingCart />}
+              trend={trends.transactions}
+              color="success"
             />
           </Grid>
         )}
 
-        <Grid item xs={12} md={3}>
-          <DashboardCard
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
             title="Low Stock Items"
             value={lowStockItems.length}
-            icon={<Warning color="error" />}
+            icon={<Warning />}
+            color="error"
           />
         </Grid>
 
-        {/* Recent Transactions - Only visible to admin and manager */}
         {!isCashier && (
           <Grid item xs={12} md={8}>
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>
+            <Paper elevation={0} sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight="bold" mb={3}>
                 Recent Transactions
               </Typography>
-              {recentTransactions.map(transaction => (
-                <Box 
-                  key={transaction.id}
-                  sx={{ 
-                    p: 2, 
-                    mb: 1, 
-                    border: '1px solid #eee',
-                    borderRadius: 1
-                  }}
-                >
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Typography variant="body2" color="textSecondary">
-                        ID: #{transaction.id}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="body2">
+              <List>
+                {recentTransactions.map((transaction) => (
+                  <React.Fragment key={transaction.id}>
+                    <ListItem>
+                      <ListItemAvatar>
+                        <Avatar sx={{ bgcolor: "primary.light" }}>
+                          <ShoppingCart />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={
+                          <Typography variant="subtitle2">
+                            Order #{transaction.id}
+                          </Typography>
+                        }
+                        secondary={new Date(
+                          transaction.timestamp
+                        ).toLocaleString()}
+                      />
+                      <Typography variant="subtitle1" fontWeight="bold">
                         {formatCurrency(transaction.total)}
                       </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="body2">
-                        {transaction.timestamp.toLocaleString()}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Box>
-              ))}
+                    </ListItem>
+                    <Divider variant="inset" component="li" />
+                  </React.Fragment>
+                ))}
+              </List>
             </Paper>
           </Grid>
         )}
       </Grid>
     </Box>
-  )
-}
+  );
+};
 
-export default Dashboard 
+export default Dashboard;

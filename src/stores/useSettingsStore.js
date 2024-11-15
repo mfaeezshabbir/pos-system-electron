@@ -139,7 +139,9 @@ export const useSettingsStore = create(
             currencyCode
           }
         }))
-      }
+      },
+
+      updateSystemSettings: (newSettings) => set({ systemSettings: newSettings }),
     }),
     {
       name: 'settings-storage',

@@ -15,10 +15,27 @@ export const printOptions = {
 
 export const printReceipt = async (receiptData) => {
   try {
+    const { printerName, copies, data } = receiptData
+    
+    const printOptions = {
+      silent: true,
+      printBackground: false,
+      color: false,
+      margin: {
+        marginType: 'printableArea'
+      },
+      landscape: false,
+      pagesPerSheet: 1,
+      collate: false,
+      copies: copies || 1,
+      printerName: printerName
+    }
+
     const result = await window.electron.printReceipt({
-      ...receiptData,
+      data,
       options: printOptions
     })
+    
     return result
   } catch (error) {
     console.error('Print error:', error)
