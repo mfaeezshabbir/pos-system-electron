@@ -16,11 +16,14 @@ import Inventory from './pages/Inventory'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
+import Customers from './pages/Customers'
+import Profile from './pages/Profile'
 
 // Components
 import PrivateRoute from './components/PrivateRoute'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/Auth/ProtectedRoute'
+import Toast from './components/common/Toast'
 
 function App() {
     const theme = useSettingsStore(state => state.systemSettings.theme)
@@ -52,11 +55,18 @@ function App() {
                                     <Settings />
                                 </ProtectedRoute>
                             } />
+                            <Route path="/customers" element={
+                                <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                                    <Customers />
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/profile" element={<Profile />} />
                         </Route>
 
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="*" element={<NotFound />} />
                     </Routes>
+                    <Toast />
                 </BrowserRouter>
             </LocalizationProvider>
         </ThemeProvider>

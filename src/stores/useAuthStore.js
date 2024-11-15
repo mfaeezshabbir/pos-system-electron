@@ -96,7 +96,30 @@ const useAuthStore = create(
                 return !!(currentUser && token && isAuthenticated)
             },
 
-            clearError: () => set({ error: null })
+            clearError: () => set({ error: null }),
+
+            updateUserProfile: async (userData) => {
+                try {
+                    const { currentUser } = get()
+                    set({ loading: true, error: null })
+
+                    // Here you would typically make an API call to update the user profile
+                    // For now, we'll just update the local state
+                    set({
+                        currentUser: {
+                            ...currentUser,
+                            name: userData.name,
+                            profilePic: userData.profilePic
+                        },
+                        loading: false
+                    })
+
+                    return true
+                } catch (error) {
+                    set({ error: error.message, loading: false })
+                    throw error
+                }
+            }
         }),
         {
             name: 'auth-store',

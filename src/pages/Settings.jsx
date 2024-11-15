@@ -13,6 +13,7 @@ import UserManagement from '../components/Settings/UserManagement'
 import { usePermissions } from '../hooks/usePermissions'
 import { PERMISSIONS } from '../hooks/usePermissions'
 import useAuthStore, { ROLES } from '../stores/useAuthStore'
+import useNotificationStore from '../stores/useNotificationStore'
 
 const Settings = () => {
     const { hasPermission } = usePermissions()
@@ -47,6 +48,11 @@ const Settings = () => {
     }
 
     const CurrentTabComponent = availableTabs[tab]?.component
+
+    const handleSystemSettingsUpdate = (settings) => {
+        updateSystemSettings(settings)
+        useNotificationStore.getState().addSystemUpdateNotification('settings', 'System settings updated')
+    }
 
     return (
         <Box>

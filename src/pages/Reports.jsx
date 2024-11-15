@@ -1,7 +1,7 @@
 import React from 'react'
-import { 
-  Box, 
-  Paper, 
+import {
+  Box,
+  Paper,
   Typography,
   Grid,
   TextField,
@@ -16,11 +16,18 @@ import { generatePDF } from '../utils/pdfGenerator'
 const Reports = () => {
   const [startDate, setStartDate] = React.useState(dayjs())
   const [endDate, setEndDate] = React.useState(dayjs())
-  
+
   const { getSalesSummary, getPaymentMethodSummary } = useTransactionStore()
-  
-  const salesData = getSalesSummary(startDate, endDate)
-  const paymentData = getPaymentMethodSummary(startDate, endDate)
+
+  const salesData = getSalesSummary(startDate, endDate) || {
+    totalRevenue: 0,
+    netSales: 0,
+    taxAmount: 0,
+    discountAmount: 0,
+    transactionCount: 0
+  }
+
+  const paymentData = getPaymentMethodSummary(startDate, endDate) || {}
 
   const handleExport = () => {
     generatePDF({
@@ -53,8 +60,8 @@ const Reports = () => {
             />
           </Grid>
           <Grid item xs={12} md={4}>
-            <Button 
-              variant="contained" 
+            <Button
+              variant="contained"
               onClick={handleExport}
             >
               Export Report
@@ -108,4 +115,4 @@ const Reports = () => {
   )
 }
 
-export default Reports 
+export default Reports

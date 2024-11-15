@@ -179,7 +179,13 @@ const useInventoryStore = create(
       clearError: () => set({ error: null }),
 
       // Reset store
-      resetStore: () => set({ products: [], categories: [], error: null })
+      resetStore: () => set({ products: [], categories: [], error: null }),
+
+      // Add getItem function
+      getItem: (productId) => {
+        const state = get()
+        return state.products.find(product => product.id === productId)
+      }
     }),
     {
       name: 'inventory-store',

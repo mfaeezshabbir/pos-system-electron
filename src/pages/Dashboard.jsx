@@ -18,6 +18,7 @@ import useTransactionStore from '../stores/useTransactionStore'
 import useInventoryStore from '../stores/useInventoryStore'
 import { formatCurrency } from '../utils/formatters'
 import useAuthStore, { ROLES } from '../stores/useAuthStore'
+import useDashboardStore from '../stores/useDashboardStore'
 
 const DashboardCard = ({ title, value, icon, color }) => (
   <Card>
@@ -35,12 +36,27 @@ const DashboardCard = ({ title, value, icon, color }) => (
 
 const Dashboard = () => {
   const { currentUser } = useAuthStore()
-  const { getDailySalesReport } = useTransactionStore()
+  const { todaySales, todayTransactions, recentTransactions } = useDashboardStore()
   const { products, getLowStockProducts } = useInventoryStore()
   
-  const todayReport = getDailySalesReport(new Date())
   const lowStockItems = getLowStockProducts()
   const isCashier = currentUser?.role === ROLES.CASHIER
+
+  // Reset daily stats at midnight
+  React.useEffect(() => {
+    const now = new Date()
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+    
+    const timeUntilMidnight = tomorrow - now
+    
+    const timer = setTimeout(() => {
+      useDashboardStore.getState().resetDailyStats()
+    }, timeUntilMidnight)
+
+    return () => clearTimeout(timer)
+  }, [])
 
   return (
     <Box>
@@ -52,7 +68,7 @@ const Dashboard = () => {
           <Grid item xs={12} md={3}>
             <DashboardCard
               title="Today's Sales"
-              value={formatCurrency(todayReport.totalSales)}
+              value={formatCurrency(todaySales)}
               icon={<TrendingUp color="primary" />}
             />
           </Grid>
@@ -70,7 +86,7 @@ const Dashboard = () => {
           <Grid item xs={12} md={3}>
             <DashboardCard
               title="Today's Transactions"
-              value={todayReport.totalTransactions}
+              value={todayTransactions}
               icon={<ShoppingCart color="success" />}
             />
           </Grid>
@@ -91,7 +107,7 @@ const Dashboard = () => {
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Recent Transactions
               </Typography>
-              {todayReport.transactions.slice(0, 5).map(transaction => (
+              {recentTransactions.map(transaction => (
                 <Box 
                   key={transaction.id}
                   sx={{ 
@@ -109,12 +125,12 @@ const Dashboard = () => {
                     </Grid>
                     <Grid item xs={4}>
                       <Typography variant="body2">
-                        {formatCurrency(transaction.amount)}
+                        {formatCurrency(transaction.total)}
                       </Typography>
                     </Grid>
                     <Grid item xs={4}>
                       <Typography variant="body2">
-                        {transaction.date.toLocaleString()}
+                        {transaction.timestamp.toLocaleString()}
                       </Typography>
                     </Grid>
                   </Grid>
