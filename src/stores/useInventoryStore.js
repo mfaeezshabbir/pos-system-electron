@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { DEFAULT_PRODUCT_IMAGE } from '../utils/constants'
 
 const validateProduct = (product) => {
   const errors = []
@@ -28,25 +29,18 @@ const useInventoryStore = create(
           return false
         }
 
-        // Save previous state for recovery
-        const previousState = get()
-        set({ previousState, loading: true })
-
-        try {
-          set(state => ({
-            products: [...state.products, {
-              ...product,
-              id: Date.now().toString(),
-              createdAt: new Date().toISOString()
-            }],
-            loading: false,
-            error: null
-          }))
-          return true
-        } catch (error) {
-          set({ ...previousState, error: error.message })
-          return false
+        const newProduct = {
+          ...product,
+          id: Date.now() + Math.random(),
+          image: product.image || DEFAULT_PRODUCT_IMAGE,
+          createdAt: new Date().toISOString()
         }
+
+        set(state => ({
+          products: [...state.products, newProduct],
+          error: null
+        }))
+        return true
       },
 
       updateProduct: (updatedProduct) => {
@@ -61,7 +55,7 @@ const useInventoryStore = create(
 
         try {
           set(state => ({
-            products: state.products.map(product => 
+            products: state.products.map(product =>
               product.id === updatedProduct.id ? updatedProduct : product
             ),
             loading: false,
@@ -89,7 +83,8 @@ const useInventoryStore = create(
         set(state => ({
           products: [...state.products, ...productsArray.map(product => ({
             ...product,
-            id: Date.now() + Math.random()
+            id: Date.now() + Math.random(),
+            image: product.image || DEFAULT_PRODUCT_IMAGE
           }))],
           error: null
         }))
@@ -197,4 +192,4 @@ const useInventoryStore = create(
   )
 )
 
-export default useInventoryStore 
+export default useInventoryStore

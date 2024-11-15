@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react";
 import {
   Grid,
   Card,
@@ -6,49 +6,57 @@ import {
   Typography,
   CardMedia,
   Box,
-  Chip
-} from '@mui/material'
-import useInventoryStore from '../../stores/useInventoryStore'
-import { formatCurrency } from '../../utils/formatters'
-import useCartStore from '../../stores/useCartStore'
+  Chip,
+} from "@mui/material";
+import useInventoryStore from "../../stores/useInventoryStore";
+import { formatCurrency } from "../../utils/formatters";
+import useCartStore from "../../stores/useCartStore";
+import useSettingsStore from "../../stores/useSettingsStore";
 
 const ProductGrid = ({ onProductSelect, disabled }) => {
-  const { products, searchProducts } = useInventoryStore()
-  const cartItems = useCartStore(state => state.items)
-  const [searchTerm, setSearchTerm] = React.useState('')
-  const [filteredProducts, setFilteredProducts] = React.useState(products)
+  const { products, searchProducts } = useInventoryStore();
+  const cartItems = useCartStore((state) => state.items);
+  const { posSettings } = useSettingsStore();
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [filteredProducts, setFilteredProducts] = React.useState(products);
 
   React.useEffect(() => {
     if (searchTerm) {
-      setFilteredProducts(searchProducts(searchTerm))
+      setFilteredProducts(searchProducts(searchTerm));
     } else {
-      setFilteredProducts(products)
+      setFilteredProducts(products);
     }
-  }, [searchTerm, products])
+  }, [searchTerm, products, searchProducts]);
 
   const getCartQuantity = (productId) => {
-    const cartItem = cartItems.find(item => item.id === productId)
-    return cartItem?.quantity || 0
-  }
+    const cartItem = cartItems.find((item) => item.id === productId);
+    return cartItem?.quantity || 0;
+  };
 
   return (
     <Box>
       <Grid container spacing={2}>
-        {filteredProducts.map(product => {
-          const cartQuantity = getCartQuantity(product.id)
-          const remainingStock = product.stock - cartQuantity
+        {filteredProducts.map((product) => {
+          const cartQuantity = getCartQuantity(product.id);
+          const remainingStock = product.stock - cartQuantity;
 
           return (
             <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
               <Card
-                onClick={() => !disabled && remainingStock > 0 && onProductSelect(product)}
+                onClick={() =>
+                  !disabled && remainingStock > 0 && onProductSelect(product)
+                }
                 sx={{
-                  cursor: disabled || remainingStock <= 0 ? 'not-allowed' : 'pointer',
+                  cursor:
+                    disabled || remainingStock <= 0 ? "not-allowed" : "pointer",
                   opacity: disabled || remainingStock <= 0 ? 0.6 : 1,
-                  '&:hover': (!disabled && remainingStock > 0) ? {
-                    transform: 'scale(1.02)',
-                    transition: 'transform 0.2s'
-                  } : {}
+                  "&:hover":
+                    !disabled && remainingStock > 0
+                      ? {
+                          transform: "scale(1.02)",
+                          transition: "transform 0.2s",
+                        }
+                      : {},
                 }}
               >
                 {product.image && (
@@ -60,12 +68,21 @@ const ProductGrid = ({ onProductSelect, disabled }) => {
                   />
                 )}
                 <CardContent>
-                  <Typography variant="h6" noWrap>{product.name}</Typography>
-                  <Typography color="textSecondary">
+                  <Typography variant="h6" noWrap>
+                    {product.name}
+                  </Typography>
+                  <Typography variant="subtitle1" color="primary">
                     {formatCurrency(product.price)}
                   </Typography>
 
-                  <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      mt: 2,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
                     <Chip
                       label={`Stock: ${remainingStock}`}
                       color={remainingStock > 0 ? "success" : "error"}
@@ -82,11 +99,11 @@ const ProductGrid = ({ onProductSelect, disabled }) => {
                 </CardContent>
               </Card>
             </Grid>
-          )
+          );
         })}
       </Grid>
     </Box>
-  )
-}
+  );
+};
 
-export default ProductGrid
+export default ProductGrid;

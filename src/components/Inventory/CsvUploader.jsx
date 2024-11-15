@@ -8,8 +8,10 @@ import {
   LinearProgress
 } from '@mui/material'
 import { Upload, Download } from '@mui/icons-material'
-import { parseProductsCSV, exportToCSV } from '../../utils/csvHandler'
+import { parseProductsCSV } from '../../utils/csvHandler'
 import useInventoryStore from '../../stores/useInventoryStore'
+import { exportInventoryData } from '../../utils/exportHandler'
+import { importInventoryData } from '../../utils/importHandler'
 
 const CsvUploader = () => {
   const [uploading, setUploading] = React.useState(false)
@@ -24,8 +26,8 @@ const CsvUploader = () => {
     setError(null)
 
     try {
-      const parsedProducts = await parseProductsCSV(file)
-      addBulkProducts(parsedProducts)
+      const products = await importInventoryData(file)
+      addBulkProducts(products)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -33,8 +35,12 @@ const CsvUploader = () => {
     }
   }
 
-  const handleExport = () => {
-    exportToCSV(products, 'inventory_export.csv')
+  const handleExport = async () => {
+    try {
+      await exportInventoryData(products)
+    } catch (error) {
+      setError('Export failed: ' + error.message)
+    }
   }
 
   return (
@@ -45,20 +51,20 @@ const CsvUploader = () => {
 
       <Box sx={{ mb: 3 }}>
         <input
-          accept=".csv"
+          accept=".csv,.zip"
           style={{ display: 'none' }}
-          id="csv-file-upload"
+          id="file-upload"
           type="file"
           onChange={handleFileUpload}
         />
-        <label htmlFor="csv-file-upload">
+        <label htmlFor="file-upload">
           <Button
             variant="contained"
             component="span"
             startIcon={<Upload />}
             disabled={uploading}
           >
-            Import CSV
+            Import Data
           </Button>
         </label>
 
@@ -68,7 +74,7 @@ const CsvUploader = () => {
           onClick={handleExport}
           sx={{ ml: 2 }}
         >
-          Export CSV
+          Export Data
         </Button>
       </Box>
 
@@ -81,7 +87,7 @@ const CsvUploader = () => {
       )}
 
       <Typography variant="body2" color="textSecondary">
-        CSV file should contain the following columns: SKU, Name, Category, Price, Stock, MinStock, Description
+        Supported formats: CSV file or ZIP archive containing CSV and images
       </Typography>
     </Paper>
   )

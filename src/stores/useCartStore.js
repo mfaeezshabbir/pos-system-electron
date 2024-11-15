@@ -143,28 +143,17 @@ const useCartStore = create(
           return false
         }
 
-        // Validate stock availability before completing transaction
-        const inventory = useInventoryStore.getState()
-        for (const item of state.items) {
-          const stockItem = inventory.getItem(item.id)
-          if (!stockItem || stockItem.quantity < item.quantity) {
-            set({ error: `Insufficient stock for ${item.name}` })
-            return false
-          }
-        }
-
         const totals = state.getCartTotals()
         const transactionData = {
           id: Date.now().toString(),
           timestamp: new Date().toISOString(),
           items: state.items,
           customerId: state.customer?.id,
+          customerName: state.customer?.name,
           paymentMethod: paymentDetails.method,
           amountPaid: paymentDetails.amountPaid,
           change: paymentDetails.change,
           subtotal: totals.subtotal,
-          tax: totals.taxAmount,
-          discount: totals.discountAmount,
           total: totals.total,
           status: paymentDetails.method === 'khata' ? 'pending' : 'completed',
           cashierId: useAuthStore.getState().currentUser.id
@@ -177,9 +166,14 @@ const useCartStore = create(
               return false
             }
 
-            const success = useCustomerStore.getState().addKhataTransaction(
+            // Add to pending payments
+            const customerStore = useCustomerStore.getState()
+            const success = customerStore.addPendingPayment(
               state.customer.id,
-              transactionData
+              {
+                ...transactionData,
+                dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+              }
             )
 
             if (!success) {

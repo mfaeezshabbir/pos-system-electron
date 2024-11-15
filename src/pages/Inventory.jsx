@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react";
 import {
   Box,
   Paper,
@@ -6,48 +6,91 @@ import {
   Button,
   Tabs,
   Tab,
-  Stack
-} from '@mui/material'
-import { Add, Category } from '@mui/icons-material'
-import ProductList from '../components/Inventory/ProductList'
-import ProductForm from '../components/Inventory/ProductForm'
-import CsvUploader from '../components/Inventory/CsvUploader'
-import CategoryDialog from '../components/Inventory/CategoryDialog'
-import useInventoryStore from '../stores/useInventoryStore'
-import { Permission } from '../components/Auth/Permission'
-import { PERMISSIONS } from '../hooks/usePermissions'
-import useNotificationStore from '../stores/useNotificationStore'
-import useAuthStore, { ROLES } from '../stores/useAuthStore'
+  Stack,
+} from "@mui/material";
+import { Add, Category } from "@mui/icons-material";
+import ProductList from "../components/Inventory/ProductList";
+import ProductForm from "../components/Inventory/ProductForm";
+import CsvUploader from "../components/Inventory/CsvUploader";
+import CategoryDialog from "../components/Inventory/CategoryDialog";
+import useInventoryStore from "../stores/useInventoryStore";
+import { Permission } from "../components/Auth/Permission";
+import { PERMISSIONS } from "../hooks/usePermissions";
+import useNotificationStore from "../stores/useNotificationStore";
+import useAuthStore, { ROLES } from "../stores/useAuthStore";
+import SearchBar from "../components/common/SearchBar";
+import ConfirmDialog from "../components/common/ConfirmDialog";
+import useSettingsStore from "../stores/useSettingsStore";
 
 const Inventory = () => {
-  const [tab, setTab] = React.useState(0)
-  const [isFormOpen, setIsFormOpen] = React.useState(false)
-  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = React.useState(false)
-  const { products, addProduct, updateProduct, deleteProduct } = useInventoryStore()
-  const { posSettings } = useNotificationStore()
-  const { currentUser } = useAuthStore()
+  const [tab, setTab] = React.useState(0);
+  const [isFormOpen, setIsFormOpen] = React.useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = React.useState(false);
+  const { products, addProduct, updateProduct, deleteProduct } =
+    useInventoryStore();
+  const { currentUser } = useAuthStore();
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
+  const [productToDelete, setProductToDelete] = React.useState(null);
+  const [selectedProduct, setSelectedProduct] = React.useState(null);
+  const { posSettings } = useSettingsStore();
 
   const handleTabChange = (event, newValue) => {
-    setTab(newValue)
-  }
+    setTab(newValue);
+  };
 
   const checkLowStock = (product) => {
-    if (product.quantity <= posSettings.lowStockThreshold) {
-      useNotificationStore.getState().addLowStockNotification(product)
+    if (
+      posSettings.showLowStockWarning &&
+      product.stock <= posSettings.lowStockThreshold
+    ) {
+      useNotificationStore.getState().addLowStockNotification(product);
     }
-  }
+  };
 
   // Check if user is admin or manager
-  const canAccessImportExport = currentUser?.role === ROLES.ADMIN || currentUser?.role === ROLES.MANAGER
+  const canAccessImportExport =
+    currentUser?.role === ROLES.ADMIN || currentUser?.role === ROLES.MANAGER;
+
+  const handleEditClick = (product) => {
+    setSelectedProduct(product);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteClick = (product) => {
+    setProductToDelete(product);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (productToDelete) {
+      const success = await deleteProduct(productToDelete.id);
+      if (success) {
+        setDeleteConfirmOpen(false);
+        setProductToDelete(null);
+        useNotificationStore.getState().addNotification({
+          type: "success",
+          message: "Product deleted successfully",
+        });
+      } else {
+        useNotificationStore.getState().addNotification({
+          message: "Failed to delete product",
+          type: "error",
+        });
+      }
+    }
+  };
 
   return (
     <Box>
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        mb: 3
-      }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
         <Typography variant="h4">Inventory Management</Typography>
         <Stack direction="row" spacing={2}>
           {/* Only admin can manage categories */}
@@ -73,9 +116,18 @@ const Inventory = () => {
         </Stack>
       </Box>
 
+      <Box sx={{ mb: 3 }}>
+        <SearchBar
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onClear={() => setSearchQuery("")}
+          placeholder="Search products..."
+        />
+      </Box>
+
       {canAccessImportExport ? (
         <>
-          <Paper sx={{ width: '100%', mb: 2 }}>
+          <Paper sx={{ width: "100%", mb: 2 }}>
             <Tabs value={tab} onChange={handleTabChange}>
               <Tab label="Products" />
               <Tab label="Import/Export" />
@@ -84,22 +136,30 @@ const Inventory = () => {
 
           {tab === 0 && (
             <ProductList
-              products={products}
-              onEdit={updateProduct}
-              onDelete={deleteProduct}
+              products={products.filter(
+                (product) =>
+                  product.name
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase()) ||
+                  product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+              )}
+              onEdit={handleEditClick}
+              onDelete={handleDeleteClick}
               userRole={currentUser?.role}
             />
           )}
 
-          {tab === 1 && (
-            <CsvUploader />
-          )}
+          {tab === 1 && <CsvUploader />}
         </>
       ) : (
         <ProductList
-          products={products}
-          onEdit={updateProduct}
-          onDelete={deleteProduct}
+          products={products.filter(
+            (product) =>
+              product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              product.sku.toLowerCase().includes(searchQuery.toLowerCase())
+          )}
+          onEdit={handleEditClick}
+          onDelete={handleDeleteClick}
           userRole={currentUser?.role}
         />
       )}
@@ -107,8 +167,34 @@ const Inventory = () => {
       {/* Product Form Dialog */}
       <ProductForm
         open={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onSubmit={addProduct}
+        onClose={() => {
+          setIsFormOpen(false);
+          setSelectedProduct(null);
+        }}
+        onSubmit={async (formData) => {
+          const success = selectedProduct
+            ? await updateProduct({ ...formData, id: selectedProduct.id })
+            : await addProduct(formData);
+
+          if (success) {
+            setIsFormOpen(false);
+            setSelectedProduct(null);
+            useNotificationStore.getState().addNotification({
+              type: "success",
+              message: `Product ${
+                selectedProduct ? "updated" : "added"
+              } successfully`,
+            });
+          } else {
+            useNotificationStore.getState().addNotification({
+              message: `Failed to ${
+                selectedProduct ? "update" : "add"
+              } product`,
+              type: "error",
+            });
+          }
+        }}
+        initialData={selectedProduct}
       />
 
       {/* Category Dialog - Only for admin */}
@@ -118,8 +204,18 @@ const Inventory = () => {
           onClose={() => setIsCategoryDialogOpen(false)}
         />
       )}
-    </Box>
-  )
-}
 
-export default Inventory 
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Product"
+        message={`Are you sure you want to delete ${productToDelete?.name}?`}
+        severity="error"
+        confirmText="Delete"
+      />
+    </Box>
+  );
+};
+
+export default Inventory;

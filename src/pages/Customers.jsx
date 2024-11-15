@@ -9,183 +9,51 @@ import {
     TableCell,
     TableContainer,
     TableHead,
-    TableRow,
-    IconButton,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    Chip
+    TableRow
 } from '@mui/material'
-import { Add, Edit, Payment, History } from '@mui/icons-material'
+import { Add } from '@mui/icons-material'
 import useCustomerStore from '../stores/useCustomerStore'
-import useTransactionStore from '../stores/useTransactionStore'
-import { formatCurrency } from '../utils/formatters'
-import CreditPaymentDialog from '../components/POS/CreditPaymentDialog'
-
-const CustomerDialog = ({ open, onClose, customer = null }) => {
-    const { addCustomer, updateCustomer } = useCustomerStore()
-    const [formData, setFormData] = React.useState({
-        name: customer?.name || '',
-        phone: customer?.phone || '',
-        creditLimit: customer?.creditLimit || 0
-    })
-
-    React.useEffect(() => {
-        if (customer) {
-            setFormData({
-                name: customer.name,
-                phone: customer.phone,
-                creditLimit: customer.creditLimit
-            })
-        }
-    }, [customer])
-
-    const handleSubmit = () => {
-        if (formData.name && formData.phone) {
-            if (customer) {
-                updateCustomer(customer.id, formData)
-            } else {
-                addCustomer(formData)
-            }
-            onClose()
-            setFormData({ name: '', phone: '', creditLimit: 0 })
-        }
-    }
-
-    return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>
-                {customer ? 'Edit Customer' : 'Add New Customer'}
-            </DialogTitle>
-            <DialogContent>
-                <TextField
-                    autoFocus
-                    fullWidth
-                    label="Name"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    margin="normal"
-                    required
-                />
-                <TextField
-                    fullWidth
-                    label="Phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    margin="normal"
-                    required
-                />
-                <TextField
-                    fullWidth
-                    type="number"
-                    label="Credit Limit"
-                    value={formData.creditLimit}
-                    onChange={(e) => setFormData(prev => ({ ...prev, creditLimit: Math.max(0, parseFloat(e.target.value)) }))}
-                    margin="normal"
-                    InputProps={{ inputProps: { min: 0 } }}
-                />
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cancel</Button>
-                <Button
-                    onClick={handleSubmit}
-                    variant="contained"
-                    color="primary"
-                    disabled={!formData.name || !formData.phone}
-                >
-                    {customer ? 'Update' : 'Add'} Customer
-                </Button>
-            </DialogActions>
-        </Dialog>
-    )
-}
-
-const TransactionHistoryDialog = ({ open, onClose, customer }) => {
-    if (!customer) return null
-
-    return (
-        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-            <DialogTitle>Transaction History - {customer.name}</DialogTitle>
-            <DialogContent>
-                <TableContainer>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Date</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell>Items</TableCell>
-                                <TableCell>Amount</TableCell>
-                                <TableCell>Status</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {customer.transactions.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} align="center">
-                                        No transactions found
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                customer.transactions.map(transaction => (
-                                    <TableRow key={transaction.id}>
-                                        <TableCell>
-                                            {new Date(transaction.timestamp).toLocaleString()}
-                                        </TableCell>
-                                        <TableCell>{transaction.type}</TableCell>
-                                        <TableCell>
-                                            {transaction.items?.map(item => item.name).join(', ') || '-'}
-                                        </TableCell>
-                                        <TableCell>{formatCurrency(transaction.total || transaction.amount)}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={transaction.status}
-                                                color={transaction.status === 'completed' ? 'success' : 'warning'}
-                                                size="small"
-                                            />
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Close</Button>
-            </DialogActions>
-        </Dialog>
-    )
-}
+import CustomerDialog from '../components/Customers/CustomerDialog'
+import TransactionHistoryDialog from '../components/Customers/TransactionHistoryDialog'
+import CustomerTableRow from '../components/Customers/CustomerTableRow'
+import SearchBar from '../components/common/SearchBar'
+import ConfirmDialog from '../components/common/ConfirmDialog'
 
 const Customers = () => {
-    const { customers, updateCustomerCredit } = useCustomerStore()
-    const [addDialogOpen, setAddDialogOpen] = React.useState(false)
-    const [paymentDialogOpen, setPaymentDialogOpen] = React.useState(false)
-    const [historyDialogOpen, setHistoryDialogOpen] = React.useState(false)
+    const { customers } = useCustomerStore()
     const [selectedCustomer, setSelectedCustomer] = React.useState(null)
-
-    const handlePayment = (amount) => {
-        if (selectedCustomer) {
-            updateCustomerCredit(selectedCustomer.id, -amount)
-            useTransactionStore.getState().addTransaction({
-                id: Date.now().toString(),
-                customerId: selectedCustomer.id,
-                amount,
-                type: 'credit_payment',
-                timestamp: new Date().toISOString(),
-                status: 'completed'
-            })
-            setPaymentDialogOpen(false)
-        }
-    }
+    const [addDialogOpen, setAddDialogOpen] = React.useState(false)
+    const [historyDialogOpen, setHistoryDialogOpen] = React.useState(false)
+    const [searchQuery, setSearchQuery] = React.useState('')
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false)
+    const [customerToDelete, setCustomerToDelete] = React.useState(null)
 
     const handleDialogClose = () => {
         setSelectedCustomer(null)
         setAddDialogOpen(false)
-        setPaymentDialogOpen(false)
         setHistoryDialogOpen(false)
+    }
+
+    const handleEditCustomer = (customer) => {
+        setSelectedCustomer(customer)
+        setAddDialogOpen(true)
+    }
+
+    const handleViewHistory = (customer) => {
+        setSelectedCustomer(customer)
+        setHistoryDialogOpen(true)
+    }
+
+    const handleDeleteClick = (customer) => {
+        setCustomerToDelete(customer)
+        setDeleteConfirmOpen(true)
+    }
+
+    const handleConfirmDelete = () => {
+        if (customerToDelete) {
+            deleteCustomer(customerToDelete.id)
+            setCustomerToDelete(null)
+        }
     }
 
     return (
@@ -201,68 +69,40 @@ const Customers = () => {
                 </Button>
             </Box>
 
+            <Box sx={{ mb: 3 }}>
+                <SearchBar
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onClear={() => setSearchQuery('')}
+                    placeholder="Search customers..."
+                />
+            </Box>
+
             <TableContainer component={Paper}>
                 <Table>
                     <TableHead>
                         <TableRow>
-                            <TableCell>Name</TableCell>
-                            <TableCell>Phone</TableCell>
-                            <TableCell>Credit Limit</TableCell>
-                            <TableCell>Current Credit</TableCell>
+                            <TableCell>Customer Details</TableCell>
+                            <TableCell>Contact</TableCell>
                             <TableCell>Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {customers.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={5} align="center">
-                                    No customers found
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            customers.map(customer => (
-                                <TableRow key={customer.id}>
-                                    <TableCell>{customer.name}</TableCell>
-                                    <TableCell>{customer.phone}</TableCell>
-                                    <TableCell>{formatCurrency(customer.creditLimit)}</TableCell>
-                                    <TableCell>
-                                        <Typography
-                                            color={customer.currentCredit > 0 ? 'error' : 'success'}
-                                            fontWeight="medium"
-                                        >
-                                            {formatCurrency(customer.currentCredit)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <IconButton
-                                            onClick={() => {
-                                                setSelectedCustomer(customer)
-                                                setAddDialogOpen(true)
-                                            }}
-                                        >
-                                            <Edit />
-                                        </IconButton>
-                                        <IconButton
-                                            onClick={() => {
-                                                setSelectedCustomer(customer)
-                                                setPaymentDialogOpen(true)
-                                            }}
-                                            disabled={customer.currentCredit <= 0}
-                                        >
-                                            <Payment />
-                                        </IconButton>
-                                        <IconButton
-                                            onClick={() => {
-                                                setSelectedCustomer(customer)
-                                                setHistoryDialogOpen(true)
-                                            }}
-                                        >
-                                            <History />
-                                        </IconButton>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
+                        {customers
+                            .filter(customer => 
+                                customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                customer.phone.includes(searchQuery) ||
+                                customer.email?.toLowerCase().includes(searchQuery.toLowerCase())
+                            )
+                            .map(customer => (
+                                <CustomerTableRow
+                                    key={customer.id}
+                                    customer={customer}
+                                    onEdit={handleEditCustomer}
+                                    onDelete={handleDeleteClick}
+                                    onViewHistory={handleViewHistory}
+                                />
+                            ))}
                     </TableBody>
                 </Table>
             </TableContainer>
@@ -273,17 +113,20 @@ const Customers = () => {
                 customer={selectedCustomer}
             />
 
-            <CreditPaymentDialog
-                open={paymentDialogOpen}
-                onClose={handleDialogClose}
-                customer={selectedCustomer}
-                onPayment={handlePayment}
-            />
-
             <TransactionHistoryDialog
                 open={historyDialogOpen}
                 onClose={handleDialogClose}
                 customer={selectedCustomer}
+            />
+
+            <ConfirmDialog
+                open={deleteConfirmOpen}
+                onClose={() => setDeleteConfirmOpen(false)}
+                onConfirm={handleConfirmDelete}
+                title="Delete Customer"
+                message={`Are you sure you want to delete ${customerToDelete?.name}? This action cannot be undone.`}
+                severity="error"
+                confirmText="Delete"
             />
         </Box>
     )

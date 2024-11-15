@@ -1,4 +1,5 @@
 import Papa from 'papaparse'
+import { DEFAULT_PRODUCT_IMAGE } from './constants'
 
 export const parseProductsCSV = (file) => {
   return new Promise((resolve, reject) => {
@@ -12,7 +13,7 @@ export const parseProductsCSV = (file) => {
         }
 
         const requiredFields = ['SKU', 'Name', 'Category', 'Price', 'Stock']
-        const hasRequiredFields = requiredFields.every(field => 
+        const hasRequiredFields = requiredFields.every(field =>
           results.meta.fields.includes(field)
         )
 
@@ -28,7 +29,8 @@ export const parseProductsCSV = (file) => {
           price: parseFloat(row.Price),
           stock: parseInt(row.Stock),
           minStock: parseInt(row.MinStock) || 5,
-          description: row.Description || ''
+          description: row.Description || '',
+          image: row.Image || DEFAULT_PRODUCT_IMAGE
         }))
 
         resolve(products)
@@ -48,12 +50,15 @@ export const exportToCSV = (products, filename) => {
     Price: product.price,
     Stock: product.stock,
     MinStock: product.minStock,
-    Description: product.description
+    Description: product.description,
+    Image: product.image || ''
   })))
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
   link.download = filename
+  document.body.appendChild(link)
   link.click()
-} 
+  document.body.removeChild(link)
+}

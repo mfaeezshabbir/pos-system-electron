@@ -21,6 +21,7 @@ import {
 import { PhotoCamera, Refresh } from '@mui/icons-material'
 import useSettingsStore from '../../stores/useSettingsStore'
 import useInventoryStore from '../../stores/useInventoryStore'
+import { DEFAULT_PRODUCT_IMAGE } from '../../utils/constants'
 
 const ProductForm = ({ open, onClose, onSubmit, initialData }) => {
     const [formData, setFormData] = React.useState({
@@ -31,7 +32,7 @@ const ProductForm = ({ open, onClose, onSubmit, initialData }) => {
         stock: '',
         minStock: '',
         description: '',
-        image: null
+        image: DEFAULT_PRODUCT_IMAGE
     })
     const [imagePreview, setImagePreview] = React.useState(null)
     const [errors, setErrors] = React.useState({})
@@ -40,7 +41,7 @@ const ProductForm = ({ open, onClose, onSubmit, initialData }) => {
     React.useEffect(() => {
         if (initialData) {
             setFormData(initialData)
-            setImagePreview(initialData.image)
+            setImagePreview(initialData.image || DEFAULT_PRODUCT_IMAGE)
         } else {
             setFormData({
                 name: '',
@@ -50,9 +51,9 @@ const ProductForm = ({ open, onClose, onSubmit, initialData }) => {
                 stock: '',
                 minStock: '',
                 description: '',
-                image: null
+                image: DEFAULT_PRODUCT_IMAGE
             })
-            setImagePreview(null)
+            setImagePreview(DEFAULT_PRODUCT_IMAGE)
         }
     }, [initialData, open])
 

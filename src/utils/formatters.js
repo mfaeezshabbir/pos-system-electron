@@ -1,15 +1,25 @@
 import { format } from 'date-fns'
 import useSettingsStore from '../stores/useSettingsStore'
 
+const currencies = [
+  { symbol: "Rs.", code: "PKR", name: "Pakistani Rupee" },
+  { symbol: "$", code: "USD", name: "US Dollar" },
+  { symbol: "€", code: "EUR", name: "Euro" },
+  { symbol: "£", code: "GBP", name: "British Pound" },
+  { symbol: "¥", code: "JPY", name: "Japanese Yen" },
+  { symbol: "₹", code: "INR", name: "Indian Rupee" },
+]
+
 // Currency formatter
 export const formatCurrency = (amount) => {
-  const { currencySymbol } = useSettingsStore.getState().posSettings
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    currencyDisplay: 'symbol',
+  const { currencyCode, currencySymbol } = useSettingsStore.getState().posSettings
+  const numberFormat = new Intl.NumberFormat('en-US', {
+    style: 'decimal',
     minimumFractionDigits: 2,
-  }).format(amount).replace('$', currencySymbol)
+    maximumFractionDigits: 2
+  })
+  
+  return `${currencySymbol} ${numberFormat.format(amount)}`
 }
 
 // Date formatter
