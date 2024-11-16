@@ -5,6 +5,8 @@ import useAuthStore from './useAuthStore'
 import useTransactionStore from './useTransactionStore'
 import useCustomerStore from './useCustomerStore'
 import useNotificationStore from './useNotificationStore'
+import useSettingsStore from './useSettingsStore'
+import useSyncStore from './useSyncStore'
 
 const useCartStore = create((set, get) => ({
   items: [],
@@ -166,47 +168,69 @@ const useCartStore = create((set, get) => ({
       const { items, customer, discount, tax } = get();
       const inventoryStore = useInventoryStore.getState();
       const transactionStore = useTransactionStore.getState();
+      const { businessInfo } = useSettingsStore.getState();
       
-      // Update stock
+      // Calculate total
+      const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+      const totalAmount = subtotal + tax - (discount || 0);
+
+      // Update inventory stock for each item
       for (const item of items) {
-        await inventoryStore.adjustStock(item.id, -item.quantity, 'Sale transaction', 'sale');
-      }
-
-      // Create transaction record
-      const transaction = {
-        id: Date.now().toString(),
-        items: [...items],
-        customer: customer || { id: 'walk-in', name: 'Walk-in Customer' },
-        total: paymentDetails.total,
-        subtotal: items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-        discount,
-        tax,
-        paymentMethod: paymentDetails.method,
-        amountPaid: paymentDetails.amountPaid,
-        change: paymentDetails.change,
-        status: paymentDetails.method === 'khata' ? 'unpaid' : 'completed',
-        timestamp: new Date().toISOString(),
-        userId: useAuthStore.getState().currentUser?.id
-      };
-
-      await transactionStore.addTransaction(transaction);
-
-      if (customer && paymentDetails.method === 'khata') {
-        const success = await useCustomerStore.getState().addKhataTransaction(
-          customer.id,
-          {
-            total: transaction.total,
-            items: transaction.items,
-            timestamp: transaction.timestamp,
-            status: 'unpaid'
-          }
+        const success = await inventoryStore.adjustStock(
+          item.id,
+          -item.quantity,
+          'Sale transaction',
+          'sale'
         );
+        
         if (!success) {
-          throw new Error('Failed to add Khata transaction');
+          throw new Error(`Failed to update stock for ${item.name}`);
         }
       }
 
+      // Create transaction record with business details
+      const transaction = {
+        id: Date.now().toString(),
+        items: items.map(item => ({
+          ...item,
+          subtotal: item.quantity * item.price
+        })),
+        businessDetails: {
+          name: businessInfo.name,
+          address: businessInfo.address,
+          phone: businessInfo.phone,
+          email: businessInfo.email,
+          website: businessInfo.website,
+          taxId: businessInfo.taxId
+        },
+        subtotal,
+        taxAmount: tax,
+        taxRate: tax ? ((tax / subtotal) * 100).toFixed(2) : 0,
+        discount: discount || 0,
+        total: totalAmount,
+        timestamp: new Date(),
+        customerId: customer?.id || 'walk-in',
+        customerName: customer?.name || 'Walk-in Customer',
+        customerPhone: customer?.phone || '',
+        customerAddress: customer?.address || '',
+        paymentMethod: paymentDetails.method,
+        amountPaid: paymentDetails.amountPaid,
+        change: paymentDetails.change,
+        status: paymentDetails.method === 'khata' ? 'unpaid' : 'completed'
+      };
+
+      // Add transaction to store
+      await transactionStore.addTransaction(transaction);
+      
+      // Clear the cart after successful transaction
       await get().clearCart();
+
+      // Broadcast inventory update
+      useSyncStore.getState().broadcastUpdate('INVENTORY_UPDATE', {
+        action: 'sale',
+        items: items
+      });
+
       return true;
     } catch (error) {
       console.error('Error completing transaction:', error);

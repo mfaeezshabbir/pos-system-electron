@@ -21,7 +21,11 @@ export const formatCurrency = (amount) => {
 // Date formatter
 export const formatDate = (date) => {
   try {
-    return format(new Date(date), 'MM/dd/yyyy');
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return 'Invalid Date';
+    }
+    return format(dateObj, 'dd/MM/yyyy');
   } catch (error) {
     console.error('Date formatting error:', error);
     return 'Invalid Date';
@@ -31,7 +35,11 @@ export const formatDate = (date) => {
 // Time formatter
 export const formatTime = (date) => {
   try {
-    return format(new Date(date), 'HH:mm:ss');
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) {
+      return 'Invalid Time';
+    }
+    return format(dateObj, 'HH:mm:ss');
   } catch (error) {
     console.error('Time formatting error:', error);
     return 'Invalid Time';

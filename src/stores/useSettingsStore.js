@@ -1,23 +1,23 @@
 import { create } from 'zustand'
 import { dbOperations, STORES } from '../utils/db'
+import defaultLogo from '../assets/default-business-logo';
 
-const defaultSettings = {
-  businessInfo: {
-    name: '',
-    address: '',
-    phone: '',
-    email: '',
-    taxId: '',
-    logo: null,
-  },
+const DEFAULT_BUSINESS_INFO = {
+  name: 'SNS ZARAI MARKAZ',
+  address: 'Fedar Adda, Minchinabad',
+  phone: '03421590004',
+  email: 'snszaraimarkaz@gmail.com',
+  website: 'www.snszaraimarkaz.com',
+  taxId: '',
+  logo: defaultLogo
+};
+
+const useSettingsStore = create((set, get) => ({
+  businessInfo: DEFAULT_BUSINESS_INFO,
   receiptSettings: {
-    showLogo: true,
-    footer: '',
-    header: '',
-    fontSize: 12,
-    printAutomatically: true,
-    copies: 1,
-    thermalPrinterName: "",
+    footer: 'Thank you for your business!',
+    returnPolicy: 'Returns accepted within 7 days with receipt',
+    showQR: false
   },
   posSettings: {
     defaultTaxRate: 0,
@@ -47,21 +47,53 @@ const defaultSettings = {
     salesAlerts: true,
     emailNotifications: false,
     emailRecipients: [],
-  }
-}
-
-const useSettingsStore = create((set, get) => ({
-  ...defaultSettings,
+  },
 
   initializeSettings: async () => {
-    const settings = await dbOperations.get(STORES.SETTINGS, 'appSettings')
-    if (settings) {
-      set(settings)
-    } else {
-      await dbOperations.put(STORES.SETTINGS, { 
-        id: 'appSettings',
-        ...defaultSettings 
-      })
+    try {
+      const settings = await dbOperations.get(STORES.SETTINGS, 'appSettings');
+      if (settings) {
+        set({
+          businessInfo: settings.businessInfo || DEFAULT_BUSINESS_INFO,
+          receiptSettings: settings.receiptSettings || get().receiptSettings,
+          posSettings: settings.posSettings || get().posSettings,
+          systemSettings: settings.systemSettings || get().systemSettings,
+          notificationSettings: settings.notificationSettings || get().notificationSettings
+        });
+      } else {
+        // If no settings exist, save defaults
+        const defaultSettings = {
+          id: 'appSettings',
+          businessInfo: DEFAULT_BUSINESS_INFO,
+          receiptSettings: get().receiptSettings,
+          posSettings: get().posSettings,
+          systemSettings: get().systemSettings,
+          notificationSettings: get().notificationSettings
+        };
+        await dbOperations.put(STORES.SETTINGS, defaultSettings);
+        set(defaultSettings);
+      }
+    } catch (error) {
+      console.error('Failed to initialize settings:', error);
+    }
+  },
+
+  updateBusinessInfo: async (info) => {
+    try {
+      const settings = await dbOperations.get(STORES.SETTINGS, 'appSettings');
+      const currentState = get();
+      const updatedSettings = {
+        ...settings,
+        businessInfo: { ...info },
+        receiptSettings: currentState.receiptSettings,
+        posSettings: currentState.posSettings,
+        systemSettings: currentState.systemSettings,
+        notificationSettings: currentState.notificationSettings
+      };
+      await dbOperations.put(STORES.SETTINGS, updatedSettings);
+      set({ businessInfo: info });
+    } catch (error) {
+      console.error('Failed to update business info:', error);
     }
   },
 
@@ -92,7 +124,7 @@ const useSettingsStore = create((set, get) => ({
       systemSettings: newSettings.systemSettings,
       notificationSettings: newSettings.notificationSettings
     };
-    
+
     await dbOperations.put(STORES.SETTINGS, settingsToStore);
     set(newSettings);
   },

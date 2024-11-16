@@ -50,28 +50,35 @@ const useDashboardStore = create((set, get) => ({
     set(resetStats);
   },
 
-  updateSalesData: async (transaction) => {
+  updateSalesData: async () => {
     const today = dayjs();
-    const transactionDate = dayjs(transaction.timestamp);
+    let todaySales = 0;
+    let todayTransactions = 0;
     
-    if (transactionDate.isSame(today, 'day')) {
-      const currentStats = await dbOperations.get(STORES.DASHBOARD, 'dailyStats') || {
-        todaySales: 0,
-        todayTransactions: 0
-      };
-      
-      const updatedStats = {
-        todaySales: currentStats.todaySales + transaction.total,
-        todayTransactions: currentStats.todayTransactions + 1
-      };
-      
-      await dbOperations.put(STORES.DASHBOARD, {
-        id: 'dailyStats',
-        ...updatedStats
-      });
-      
-      set(updatedStats);
-    }
+    // Get all transactions for today
+    const transactions = await dbOperations.getAll(STORES.TRANSACTIONS);
+    
+    transactions.forEach(transaction => {
+      const transactionDate = dayjs(transaction.timestamp);
+      // Only count completed transactions or non-khata transactions
+      if (transactionDate.isSame(today, 'day') && 
+          (transaction.status === 'completed' || transaction.paymentMethod !== 'khata')) {
+        todaySales += transaction.total || 0;
+        todayTransactions += 1;
+      }
+    });
+    
+    const updatedStats = {
+      todaySales,
+      todayTransactions
+    };
+    
+    await dbOperations.put(STORES.DASHBOARD, {
+      id: 'dailyStats',
+      ...updatedStats
+    });
+    
+    set(updatedStats);
   },
 
   scheduleDailyReset: async () => {

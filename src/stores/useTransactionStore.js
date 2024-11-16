@@ -2,6 +2,17 @@ import { create } from 'zustand'
 import { dbOperations, STORES } from '../utils/db'
 import dayjs from 'dayjs'
 import useCustomerStore from './useCustomerStore'
+import useSettingsStore from './useSettingsStore'
+
+// Import the default business info constant
+const DEFAULT_BUSINESS_INFO = {
+    name: 'SNS ZARAI MARKAZ',
+    address: 'Fedar Adda, Minchinabad',
+    phone: '03421590004',
+    email: 'snszaraimarkaz@gmail.com',
+    website: 'www.snszaraimarkaz.com',
+    taxId: '',
+};
 
 const useTransactionStore = create((set, get) => ({
     transactions: [],
@@ -22,9 +33,9 @@ const useTransactionStore = create((set, get) => ({
     getSalesSummary: (startDate, endDate) => {
         const transactions = get().transactions.filter(transaction => {
             const transactionDate = dayjs(transaction.timestamp);
-            return transactionDate.isSameOrAfter(startDate, 'day') && 
-                   transactionDate.isSameOrBefore(endDate, 'day') &&
-                   (transaction.status === 'completed' || transaction.paymentMethod !== 'khata');
+            return transactionDate.isSameOrAfter(startDate, 'day') &&
+                transactionDate.isSameOrBefore(endDate, 'day') &&
+                (transaction.status === 'completed' || transaction.paymentMethod !== 'khata');
         });
 
         return transactions.reduce((summary, transaction) => {
@@ -47,9 +58,9 @@ const useTransactionStore = create((set, get) => ({
     getPaymentMethodSummary: (startDate, endDate) => {
         const transactions = get().transactions.filter(transaction => {
             const transactionDate = dayjs(transaction.timestamp);
-            return transactionDate.isSameOrAfter(startDate, 'day') && 
-                   transactionDate.isSameOrBefore(endDate, 'day') &&
-                   (transaction.status === 'completed' || transaction.paymentMethod !== 'khata');
+            return transactionDate.isSameOrAfter(startDate, 'day') &&
+                transactionDate.isSameOrBefore(endDate, 'day') &&
+                (transaction.status === 'completed' || transaction.paymentMethod !== 'khata');
         });
 
         return transactions.reduce((summary, transaction) => {
@@ -63,16 +74,28 @@ const useTransactionStore = create((set, get) => ({
 
     addTransaction: async (transaction) => {
         try {
-            set({ loading: true });
-            await dbOperations.add(STORES.TRANSACTIONS, transaction);
+            const { businessInfo } = useSettingsStore.getState();
+
+            const transactionWithBusiness = {
+                ...transaction,
+                id: transaction.id.toString(),
+                businessDetails: {
+                    name: businessInfo?.name || DEFAULT_BUSINESS_INFO.name,
+                    address: businessInfo?.address || DEFAULT_BUSINESS_INFO.address,
+                    phone: businessInfo?.phone || DEFAULT_BUSINESS_INFO.phone,
+                    email: businessInfo?.email || DEFAULT_BUSINESS_INFO.email,
+                    website: businessInfo?.website || DEFAULT_BUSINESS_INFO.website,
+                    taxId: businessInfo?.taxId || DEFAULT_BUSINESS_INFO.taxId
+                }
+            };
+
+            await dbOperations.add(STORES.TRANSACTIONS, transactionWithBusiness);
             set(state => ({
-                transactions: [transaction, ...state.transactions],
-                loading: false
+                transactions: [...state.transactions, transactionWithBusiness]
             }));
             return true;
         } catch (error) {
             console.error('Failed to add transaction:', error);
-            set({ error: error.message, loading: false });
             return false;
         }
     },
@@ -101,7 +124,7 @@ const useTransactionStore = create((set, get) => ({
             };
 
             await dbOperations.put(STORES.TRANSACTIONS, updatedTransaction);
-            
+
             set(state => ({
                 transactions: state.transactions.map(t =>
                     t.id === transactionId ? updatedTransaction : t

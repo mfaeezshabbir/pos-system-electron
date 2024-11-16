@@ -24,13 +24,8 @@ import Layout from "./components/Layout";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Toast from "./components/common/Toast";
 import React from "react";
-import useCustomerStore from "./stores/useCustomerStore";
-import useDashboardStore from "./stores/useDashboardStore";
 import useInventoryStore from "./stores/useInventoryStore";
 import { initDB } from "./utils/db";
-import { CircularProgress, Box } from "@mui/material";
-import useTransactionStore from "./stores/useTransactionStore";
-import { dbOperations } from "./utils/db";
 import useSyncStore from "./stores/useSyncStore";
 
 function App() {
@@ -50,12 +45,13 @@ function App() {
 
   React.useEffect(() => {
     const initializeApp = async () => {
+      await useSettingsStore.getState().initializeSettings();
       try {
         await initDB();
         await useInventoryStore.getState().initializeInventory();
         setIsInitialized(true);
       } catch (error) {
-        console.error('Failed to initialize app:', error);
+        console.error("Failed to initialize app:", error);
         setError(error);
       }
     };
@@ -65,17 +61,20 @@ function App() {
 
   React.useEffect(() => {
     useSyncStore.getState().initSync();
-    
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js', {
-          scope: '/',
-          type: 'classic'
-        }).then(registration => {
-          console.log('ServiceWorker registration successful');
-        }).catch(error => {
-          console.error('ServiceWorker registration failed:', error);
-        });
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("/service-worker.js", {
+            scope: "/",
+            type: "classic",
+          })
+          .then((registration) => {
+            console.log("ServiceWorker registration successful");
+          })
+          .catch((error) => {
+            console.error("ServiceWorker registration failed:", error);
+          });
       });
     }
   }, []);

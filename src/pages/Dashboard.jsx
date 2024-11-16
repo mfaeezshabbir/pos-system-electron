@@ -169,7 +169,7 @@ const Dashboard = () => {
               lastMonthData.transactionCount) *
             100;
 
-      // Calculate product trend (based on total products vs last month)
+      // Calculate product trend
       const previousProducts = await useInventoryStore
         .getState()
         .getProductCountByDate(lastMonth.endOf("month"));
@@ -180,14 +180,22 @@ const Dashboard = () => {
           : ((currentProducts - previousProducts) / previousProducts) * 100;
 
       setTrends({
-        sales: Math.round(salesTrend),
-        products: Math.round(productsTrend),
-        transactions: Math.round(transactionsTrend),
+        sales: Number(salesTrend.toFixed(1)),
+        products: Number(productsTrend.toFixed(1)),
+        transactions: Number(transactionsTrend.toFixed(1))
       });
     };
 
     calculateTrends();
-  }, [products]);
+    
+    // Recalculate trends when transactions change
+    const unsubscribe = useTransactionStore.subscribe(
+      (state) => state.transactions,
+      () => calculateTrends()
+    );
+
+    return () => unsubscribe();
+  }, [products.length]);
 
   // Load initial data and subscribe to updates
   React.useEffect(() => {
@@ -233,6 +241,49 @@ const Dashboard = () => {
     }, timeUntilMidnight);
 
     return () => clearTimeout(timer);
+  }, []);
+
+  // Add this effect after the existing useEffects
+  React.useEffect(() => {
+    const loadTransactionData = async () => {
+      setLoading(true);
+      try {
+        // Load initial transactions
+        const transactionStore = useTransactionStore.getState();
+        await transactionStore.loadTransactions();
+        
+        // Get recent transactions
+        const transactions = transactionStore.transactions
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          .slice(0, 5);
+        
+        setRecentTransactions(transactions);
+        
+        // Update sales data
+        await updateSalesData();
+        
+      } catch (error) {
+        console.error('Error loading transaction data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTransactionData();
+
+    // Subscribe to transaction store changes
+    const unsubscribe = useTransactionStore.subscribe(
+      (state) => state.transactions,
+      (transactions) => {
+        const recentTxs = transactions
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          .slice(0, 5);
+        setRecentTransactions(recentTxs);
+        updateSalesData();
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -351,7 +402,7 @@ const Dashboard = () => {
                             alignItems="center"
                           >
                             <Typography variant="subtitle2">
-                              Order #{transaction.id.slice(-4)}
+                              Order #{(transaction.id?.toString() || '').slice(-4)}
                             </Typography>
                             <Typography
                               variant="caption"

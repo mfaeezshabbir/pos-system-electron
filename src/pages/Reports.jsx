@@ -31,14 +31,19 @@ import {
   DeleteForever,
   CheckCircle,
   Payment,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import useTransactionStore from "../stores/useTransactionStore";
 import useInventoryStore from "../stores/useInventoryStore";
 import { formatCurrency } from "../utils/formatters";
-import { generatePDF } from "../utils/pdfGenerator";
+import { generatePDF, generateReceipt } from "../utils/pdfGenerator";
 import useDashboardStore from "../stores/useDashboardStore";
 import useNotificationStore from "../stores/useNotificationStore";
+import ReceiptPreviewDialog from "../components/POS/ReceiptPreviewDialog";
+import useSettingsStore from '../stores/useSettingsStore';
 
 const Reports = () => {
   const [tab, setTab] = React.useState(0);
@@ -47,10 +52,14 @@ const Reports = () => {
   const [filteredTransactions, setFilteredTransactions] = React.useState([]);
   const [stockAdjustmentDialog, setStockAdjustmentDialog] = React.useState({
     open: false,
-    product: null
+    product: null,
   });
   const [adjustmentQuantity, setAdjustmentQuantity] = React.useState(0);
-  const [adjustmentReason, setAdjustmentReason] = React.useState('');
+  const [adjustmentReason, setAdjustmentReason] = React.useState("");
+  const [selectedReceipt, setSelectedReceipt] = React.useState(null);
+  const [categoryDialogOpen, setCategoryDialogOpen] = React.useState(false);
+  const [selectedCategory, setSelectedCategory] = React.useState(null);
+  const [newCategoryName, setNewCategoryName] = React.useState("");
 
   const {
     getSalesSummary,
@@ -85,8 +94,10 @@ const Reports = () => {
     (transactions) => {
       const filtered = transactions.filter((transaction) => {
         const transactionDate = dayjs(transaction.timestamp);
-        return transactionDate.isSameOrAfter(startDate, 'day') && 
-               transactionDate.isSameOrBefore(endDate, 'day');
+        return (
+          transactionDate.isSameOrAfter(startDate, "day") &&
+          transactionDate.isSameOrBefore(endDate, "day")
+        );
       });
       setFilteredTransactions(filtered);
     },
@@ -131,14 +142,14 @@ const Reports = () => {
         const dashboardStore = useDashboardStore.getState();
         await dashboardStore.resetDailyStats();
         await dashboardStore.updateSalesTrends();
-        
+
         // Clear local state
         setFilteredTransactions([]);
-        
+
         // Show notification
         useNotificationStore.getState().showNotification({
-          message: 'All transactions have been cleared',
-          type: 'success'
+          message: "All transactions have been cleared",
+          type: "success",
         });
       }
     }
@@ -147,28 +158,26 @@ const Reports = () => {
   const handleStockAdjustment = (product) => {
     setStockAdjustmentDialog({
       open: true,
-      product
+      product,
     });
   };
 
   const handleStockAdjustmentClose = () => {
     setStockAdjustmentDialog({
       open: false,
-      product: null
+      product: null,
     });
   };
 
   const handleStockAdjustmentSubmit = async (productId, quantity, reason) => {
-    const success = await useInventoryStore.getState().adjustStock(
-      productId,
-      quantity,
-      reason
-    );
+    const success = await useInventoryStore
+      .getState()
+      .adjustStock(productId, quantity, reason);
 
     if (success) {
       useNotificationStore.getState().addNotification({
-        type: 'success',
-        message: 'Stock adjusted successfully'
+        type: "success",
+        message: "Stock adjusted successfully",
       });
       handleStockAdjustmentClose();
     }
@@ -176,25 +185,96 @@ const Reports = () => {
 
   const handleToggleStatus = async (transaction) => {
     try {
-      if (transaction.paymentMethod !== 'khata') return;
-      
-      const newStatus = transaction.status === 'completed' ? 'unpaid' : 'completed';
-      const success = await useTransactionStore.getState().updateTransactionStatus(
-        transaction.id,
-        newStatus
-      );
-      
+      if (transaction.paymentMethod !== "khata") return;
+
+      const newStatus =
+        transaction.status === "completed" ? "unpaid" : "completed";
+      const success = await useTransactionStore
+        .getState()
+        .updateTransactionStatus(transaction.id, newStatus);
+
       if (success) {
         useNotificationStore.getState().addNotification({
-          type: 'success',
-          message: `Transaction marked as ${newStatus}`
+          type: "success",
+          message: `Transaction marked as ${newStatus}`,
         });
       }
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error("Error updating status:", error);
+      useNotificationStore.getState().addNotification({
+        type: "error",
+        message: "Failed to update status",
+      });
+    }
+  };
+
+  const handleViewReceipt = (transaction) => {
+    setSelectedReceipt(transaction);
+  };
+
+  const handlePrint = async (transaction) => {
+    try {
+      const { receiptSettings } = useSettingsStore.getState();
+      
+      // Use business details from transaction
+      const enrichedTransaction = {
+        ...transaction,
+        items: transaction.items || [],
+        timestamp: new Date(transaction.timestamp),
+        businessName: transaction.businessDetails.name,
+        businessAddress: transaction.businessDetails.address,
+        businessPhone: transaction.businessDetails.phone,
+        businessEmail: transaction.businessDetails.email,
+        businessWebsite: transaction.businessDetails.website,
+        businessTaxId: transaction.businessDetails.taxId
+      };
+
+      const doc = generateReceipt(enrichedTransaction, receiptSettings);
+      const fileName = `Receipt-${transaction.id}.pdf`;
+      doc.save(fileName);
+
+      useNotificationStore.getState().addNotification({
+        type: 'success',
+        message: 'Receipt generated successfully'
+      });
+    } catch (error) {
+      console.error('Error printing receipt:', error);
       useNotificationStore.getState().addNotification({
         type: 'error',
-        message: 'Failed to update status'
+        message: 'Failed to generate receipt'
+      });
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    
+    const success = await useInventoryStore.getState().addCategory(newCategoryName.trim());
+    
+    if (success) {
+      const settings = await dbOperations.get(STORES.SETTINGS, 'appSettings');
+      setCategories(settings?.categories || []);
+      setNewCategoryName("");
+      setCategoryDialogOpen(false);
+      useNotificationStore.getState().addNotification({
+        type: 'success',
+        message: 'Category added successfully'
+      });
+    }
+  };
+
+  const handleDeleteCategory = async (category) => {
+    const confirmed = window.confirm(`Are you sure you want to delete "${category}"?`);
+    if (!confirmed) return;
+
+    const success = await useInventoryStore.getState().deleteCategory(category);
+    
+    if (success) {
+      const settings = await dbOperations.get(STORES.SETTINGS, 'appSettings');
+      setCategories(settings?.categories || []);
+      useNotificationStore.getState().addNotification({
+        type: 'success',
+        message: 'Category deleted successfully'
       });
     }
   };
@@ -265,16 +345,54 @@ const Reports = () => {
               </TableHead>
               <TableBody>
                 {filteredTransactions.slice(0, 10).map((transaction) => (
-                  <TableRow key={transaction.id}>
+                  <TableRow
+                    key={transaction.id}
+                    onClick={() => handleViewReceipt(transaction)}
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": { bgcolor: "action.hover" },
+                    }}
+                  >
                     <TableCell>
                       {dayjs(transaction.timestamp).format("DD/MM/YYYY HH:mm")}
                     </TableCell>
-                    <TableCell>{transaction.customerName}</TableCell>
+                    <TableCell>
+                      <Stack spacing={0.5}>
+                        <Typography variant="body2">
+                          {transaction.customerName}
+                        </Typography>
+                        {transaction.customerPhone && (
+                          <Typography variant="caption" color="text.secondary">
+                            {transaction.customerPhone}
+                          </Typography>
+                        )}
+                        {transaction.paymentMethod === "khata" &&
+                          transaction.customerAddress && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              noWrap
+                            >
+                              {transaction.customerAddress}
+                            </Typography>
+                          )}
+                      </Stack>
+                    </TableCell>
                     <TableCell>{transaction.items.length} items</TableCell>
                     <TableCell align="right">
                       {formatCurrency(transaction.total)}
                     </TableCell>
-                    <TableCell>{transaction.paymentMethod}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={transaction.paymentMethod}
+                        color={
+                          transaction.paymentMethod === "khata"
+                            ? "warning"
+                            : "default"
+                        }
+                        size="small"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Chip
                         label={transaction.status}
@@ -287,15 +405,34 @@ const Reports = () => {
                       />
                     </TableCell>
                     <TableCell align="center">
-                      {transaction.paymentMethod === 'khata' && (
+                      {transaction.paymentMethod === "khata" && (
                         <Button
                           size="small"
-                          variant={transaction.status === 'completed' ? 'outlined' : 'contained'}
-                          color={transaction.status === 'completed' ? 'success' : 'primary'}
-                          onClick={() => handleToggleStatus(transaction)}
-                          startIcon={transaction.status === 'completed' ? <CheckCircle /> : <Payment />}
+                          variant={
+                            transaction.status === "completed"
+                              ? "outlined"
+                              : "contained"
+                          }
+                          color={
+                            transaction.status === "completed"
+                              ? "success"
+                              : "primary"
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleStatus(transaction);
+                          }}
+                          startIcon={
+                            transaction.status === "completed" ? (
+                              <CheckCircle />
+                            ) : (
+                              <Payment />
+                            )
+                          }
                         >
-                          {transaction.status === 'completed' ? 'Paid' : 'Mark as Paid'}
+                          {transaction.status === "completed"
+                            ? "Paid"
+                            : "Mark as Paid"}
                         </Button>
                       )}
                     </TableCell>
@@ -347,10 +484,17 @@ const Reports = () => {
       {/* Low Stock Products */}
       <Grid item xs={12} md={6}>
         <Paper sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 2,
+            }}
+          >
             <Typography variant="h6">Low Stock Alert</Typography>
-            <Chip 
-              label={`${lowStockProducts.length} items`} 
+            <Chip
+              label={`${lowStockProducts.length} items`}
               color="warning"
               size="small"
             />
@@ -371,7 +515,7 @@ const Reports = () => {
                   <TableRow key={product.id}>
                     <TableCell>{product.name}</TableCell>
                     <TableCell align="right">
-                      <Typography 
+                      <Typography
                         color={product.stock === 0 ? "error" : "warning.main"}
                         fontWeight="medium"
                       >
@@ -399,9 +543,59 @@ const Reports = () => {
     </Grid>
   );
 
+  const renderCategoriesReport = () => (
+    <Grid container spacing={3}>
+      <Grid item xs={12}>
+        <Paper sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+            <Typography variant="h6">Categories Management</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setCategoryDialogOpen(true)}
+            >
+              Add Category
+            </Button>
+          </Box>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Category Name</TableCell>
+                  <TableCell>Product Count</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {categories.map((category) => (
+                  <TableRow key={category}>
+                    <TableCell>{category}</TableCell>
+                    <TableCell>
+                      {products.filter(p => p.category === category).length}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => handleDeleteCategory(category)}
+                        startIcon={<DeleteIcon />}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      </Grid>
+    </Grid>
+  );
+
   const StockAdjustmentDialog = () => (
-    <Dialog 
-      open={stockAdjustmentDialog.open} 
+    <Dialog
+      open={stockAdjustmentDialog.open}
       onClose={handleStockAdjustmentClose}
       maxWidth="xs"
       fullWidth
@@ -435,15 +629,44 @@ const Reports = () => {
       </DialogContent>
       <DialogActions>
         <Button onClick={handleStockAdjustmentClose}>Cancel</Button>
-        <Button 
+        <Button
           variant="contained"
-          onClick={() => handleStockAdjustmentSubmit(
-            stockAdjustmentDialog.product?.id,
-            adjustmentQuantity,
-            adjustmentReason
-          )}
+          onClick={() =>
+            handleStockAdjustmentSubmit(
+              stockAdjustmentDialog.product?.id,
+              adjustmentQuantity,
+              adjustmentReason
+            )
+          }
         >
           Adjust Stock
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
+  const CategoryDialog = () => (
+    <Dialog
+      open={categoryDialogOpen}
+      onClose={() => setCategoryDialogOpen(false)}
+      maxWidth="xs"
+      fullWidth
+    >
+      <DialogTitle>Add New Category</DialogTitle>
+      <DialogContent>
+        <TextField
+          autoFocus
+          margin="dense"
+          label="Category Name"
+          fullWidth
+          value={newCategoryName}
+          onChange={(e) => setNewCategoryName(e.target.value)}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
+        <Button onClick={handleAddCategory} variant="contained">
+          Add Category
         </Button>
       </DialogActions>
     </Dialog>
@@ -505,11 +728,23 @@ const Reports = () => {
       >
         <Tab label="Sales Report" />
         <Tab label="Inventory Report" />
+        <Tab label="Categories" />
       </Tabs>
 
-      {tab === 0 ? renderSalesReport() : renderInventoryReport()}
+      {tab === 0 && renderSalesReport()}
+      {tab === 1 && renderInventoryReport()}
+      {tab === 2 && renderCategoriesReport()}
 
       <StockAdjustmentDialog />
+
+      <ReceiptPreviewDialog
+        open={!!selectedReceipt}
+        onClose={() => setSelectedReceipt(null)}
+        transaction={selectedReceipt}
+        onPrint={handlePrint}
+      />
+
+      <CategoryDialog />
     </Box>
   );
 };
