@@ -58,7 +58,7 @@ const ProductForm = ({ open, onClose, onSubmit, initialData }) => {
     }, [initialData, open])
 
     const currencySymbol = useSettingsStore(state => state.posSettings.currencySymbol)
-    const { categories } = useInventoryStore()
+    const { categories = [] } = useInventoryStore()
 
     const handleChange = (e) => {
         const { name, value } = e.target
@@ -103,7 +103,12 @@ const ProductForm = ({ open, onClose, onSubmit, initialData }) => {
     }
 
     const handleConfirm = () => {
-        const submitData = initialData ? { ...formData, id: initialData.id } : formData
+        const submitData = {
+            ...formData,
+            price: parseFloat(formData.price),
+            stock: parseInt(formData.stock),
+            minStock: parseInt(formData.minStock)
+        }
         onSubmit(submitData)
         setShowConfirmation(false)
         onClose()

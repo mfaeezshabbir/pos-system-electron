@@ -3,6 +3,10 @@ import {
     Dialog,
     DialogTitle,
     DialogContent,
+    DialogActions,
+    Button,
+    Box,
+    Typography,
     Table,
     TableBody,
     TableCell,
@@ -10,38 +14,41 @@ import {
     TableHead,
     TableRow,
     Paper,
-    Chip,
-    Typography,
-    Box
+    Chip
 } from '@mui/material'
 import { formatCurrency } from '../../utils/formatters'
+import useCustomerStore from '../../stores/useCustomerStore'
+import useNotificationStore from '../../stores/useNotificationStore'
+import { CheckCircle, Payment } from '@mui/icons-material'
+import useTransactionStore from '../../stores/useTransactionStore'
 
 const CustomerTransactions = ({ open, onClose, customer }) => {
-    if (!customer) return null
+    const { updateTransactionPaymentStatus } = useCustomerStore();
+    const { addNotification } = useNotificationStore();
+    if (!customer) return null;
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'completed':
-                return 'success'
-            case 'pending':
-                return 'warning'
-            case 'cancelled':
-                return 'error'
-            default:
-                return 'default'
+    const handlePaymentStatusUpdate = async (transaction) => {
+        try {
+            const success = await updateTransactionPaymentStatus(
+                customer.id, 
+                transaction.id, 
+                !transaction.isPaid
+            );
+            
+            if (success) {
+                addNotification({
+                    type: 'success',
+                    message: `Transaction marked as ${transaction.isPaid ? 'unpaid' : 'paid'}`
+                });
+            }
+        } catch (error) {
+            console.error('Error updating payment status:', error);
+            addNotification({
+                type: 'error',
+                message: 'Failed to update payment status'
+            });
         }
-    }
-
-    const getTransactionColor = (type) => {
-        switch (type) {
-            case 'khata':
-                return 'error.main'
-            case 'payment':
-                return 'success.main'
-            default:
-                return 'text.primary'
-        }
-    }
+    };
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -62,59 +69,48 @@ const CustomerTransactions = ({ open, onClose, customer }) => {
                             <TableRow>
                                 <TableCell>Date</TableCell>
                                 <TableCell>Type</TableCell>
-                                <TableCell>Details</TableCell>
                                 <TableCell align="right">Amount</TableCell>
                                 <TableCell>Status</TableCell>
+                                <TableCell align="center">Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {customer.transactions.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} align="center">
-                                        No transactions found
+                            {customer.transactions.map((transaction) => (
+                                <TableRow key={transaction.id}>
+                                    <TableCell>{new Date(transaction.timestamp).toLocaleDateString()}</TableCell>
+                                    <TableCell>{transaction.type}</TableCell>
+                                    <TableCell align="right">{formatCurrency(transaction.total)}</TableCell>
+                                    <TableCell>
+                                        <Chip
+                                            size="small"
+                                            label={transaction.isPaid ? 'Paid' : 'Unpaid'}
+                                            color={transaction.isPaid ? 'success' : 'warning'}
+                                        />
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        {transaction.type === 'khata' && (
+                                            <Button
+                                                variant={transaction.isPaid ? 'outlined' : 'contained'}
+                                                size="small"
+                                                color={transaction.isPaid ? 'success' : 'primary'}
+                                                onClick={() => handlePaymentStatusUpdate(transaction)}
+                                                startIcon={transaction.isPaid ? <CheckCircle /> : <Payment />}
+                                            >
+                                                {transaction.isPaid ? 'Paid' : 'Mark as Paid'}
+                                            </Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
-                            ) : (
-                                customer.transactions
-                                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-                                    .map(transaction => (
-                                        <TableRow key={transaction.id}>
-                                            <TableCell>
-                                                {new Date(transaction.timestamp).toLocaleString()}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Typography color={getTransactionColor(transaction.type)}>
-                                                    {transaction.type === 'khata' ? 'Purchase' : 'Payment'}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell>
-                                                {transaction.items ?
-                                                    transaction.items.map(item => item.name).join(', ') :
-                                                    'Payment received'
-                                                }
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <Typography color={getTransactionColor(transaction.type)}>
-                                                    {transaction.type === 'khata' ? '+ ' : '- '}
-                                                    {formatCurrency(transaction.total || transaction.amount)}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={transaction.status}
-                                                    color={getStatusColor(transaction.status)}
-                                                    size="small"
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                            )}
+                            ))}
                         </TableBody>
                     </Table>
                 </TableContainer>
             </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Close</Button>
+            </DialogActions>
         </Dialog>
-    )
-}
+    );
+};
 
-export default CustomerTransactions 
+export default CustomerTransactions; 

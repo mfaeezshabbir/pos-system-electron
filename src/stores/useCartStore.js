@@ -137,109 +137,80 @@ const useCartStore = create((set, get) => ({
   },
 
   // Calculate totals
-  getCartTotals: () => {
-    const state = get()
+  getCartTotals: (taxRate = 0) => {
+    const state = get();
     const subtotal = state.items.reduce((sum, item) => {
-      return sum + (item.price * item.quantity || 0)
-    }, 0)
+      return sum + (item.price * item.quantity || 0);
+    }, 0);
     
-    const discountAmount = (subtotal * (state.discount || 0)) / 100
-    const taxableAmount = subtotal - discountAmount
-    const taxAmount = (taxableAmount * (state.tax || 0)) / 100
-    const total = taxableAmount + taxAmount
+    const discountAmount = (subtotal * (state.discount || 0)) / 100;
+    const taxableAmount = subtotal - discountAmount;
+    // Ensure tax rate is a number and within valid range
+    const validTaxRate = Math.min(Math.max(0, parseFloat(taxRate) || 0), 100);
+    const taxAmount = (taxableAmount * validTaxRate) / 100;
+    const total = taxableAmount + taxAmount;
 
     return {
       subtotal: subtotal || 0,
       discountAmount: discountAmount || 0,
       taxAmount: taxAmount || 0,
       total: total || 0,
-      taxRate: state.tax || 0,
+      taxRate: validTaxRate,
       discountRate: state.discount || 0
-    }
+    };
   },
 
   // Complete transaction
   completeTransaction: async (paymentDetails) => {
-    const state = get();
-    if (state.items.length === 0) {
-      set({ error: 'Cart is empty' });
-      return false;
-    }
-
-    const totals = state.getCartTotals();
-    
-    // Create minimal transaction data
-    const transactionData = {
-      id: Date.now().toString(),
-      timestamp: new Date().toISOString(),
-      items: state.items.map(item => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        subtotal: item.quantity * item.price
-      })),
-      customerId: state.customer?.id,
-      customerName: state.customer?.name,
-      paymentMethod: paymentDetails.method,
-      amountPaid: paymentDetails.amountPaid,
-      change: paymentDetails.change,
-      subtotal: totals.subtotal,
-      total: totals.total,
-      status: paymentDetails.method === 'khata' ? 'pending' : 'completed',
-      cashierId: useAuthStore.getState().currentUser.id
-    };
-
     try {
-      if (paymentDetails.method === 'khata') {
-        if (!state.customer) {
-          set({ error: 'Please select a customer for khata payment' });
-          return false;
-        }
+      const { items, customer, discount, tax } = get();
+      const inventoryStore = useInventoryStore.getState();
+      const transactionStore = useTransactionStore.getState();
+      
+      // Update stock
+      for (const item of items) {
+        await inventoryStore.adjustStock(item.id, -item.quantity, 'Sale transaction', 'sale');
+      }
 
-        // Add to pending payments
-        const customerStore = useCustomerStore.getState();
-        const success = customerStore.addPendingPayment(
-          state.customer.id,
+      // Create transaction record
+      const transaction = {
+        id: Date.now().toString(),
+        items: [...items],
+        customer: customer || { id: 'walk-in', name: 'Walk-in Customer' },
+        total: paymentDetails.total,
+        subtotal: items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+        discount,
+        tax,
+        paymentMethod: paymentDetails.method,
+        amountPaid: paymentDetails.amountPaid,
+        change: paymentDetails.change,
+        status: paymentDetails.method === 'khata' ? 'unpaid' : 'completed',
+        timestamp: new Date().toISOString(),
+        userId: useAuthStore.getState().currentUser?.id
+      };
+
+      await transactionStore.addTransaction(transaction);
+
+      if (customer && paymentDetails.method === 'khata') {
+        const success = await useCustomerStore.getState().addKhataTransaction(
+          customer.id,
           {
-            ...transactionData,
-            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+            total: transaction.total,
+            items: transaction.items,
+            timestamp: transaction.timestamp,
+            status: 'unpaid'
           }
         );
-
         if (!success) {
-          set({ error: 'Credit limit exceeded' });
-          return false;
+          throw new Error('Failed to add Khata transaction');
         }
       }
 
-      // Update inventory
-      const inventory = useInventoryStore.getState();
-      state.items.forEach(item => {
-        inventory.updateStock(item.id, item.quantity, 'subtract');
-      });
-
-      // Add transaction using the transaction store
-      const success = await useTransactionStore.getState().addTransaction(transactionData);
-      
-      if (!success) {
-        set({ error: 'Failed to add transaction' });
-        return false;
-      }
-
-      // Clear cart
-      set({
-        items: [],
-        customer: null,
-        discount: 0,
-        tax: 0,
-        error: null
-      });
-
+      await get().clearCart();
       return true;
     } catch (error) {
-      set({ error: error.message });
-      return false;
+      console.error('Error completing transaction:', error);
+      throw error;
     }
   },
 

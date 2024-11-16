@@ -66,17 +66,35 @@ const useSettingsStore = create((set, get) => ({
   },
 
   updateSettings: async (section, settings) => {
-    const currentSettings = get()
+    const sanitizedSettings = Object.entries(settings).reduce((acc, [key, value]) => {
+      if (key === 'defaultTaxRate') {
+        acc[key] = parseFloat(value) || 0;
+      } else {
+        acc[key] = typeof value === 'function' ? value.toString() : value;
+      }
+      return acc;
+    }, {});
+
+    const currentSettings = get();
     const newSettings = {
-      id: 'appSettings',
       ...currentSettings,
       [section]: {
         ...currentSettings[section],
-        ...settings
+        ...sanitizedSettings
       }
-    }
-    await dbOperations.put(STORES.SETTINGS, newSettings)
-    set(newSettings)
+    };
+
+    const settingsToStore = {
+      id: 'appSettings',
+      businessInfo: newSettings.businessInfo,
+      receiptSettings: newSettings.receiptSettings,
+      posSettings: newSettings.posSettings,
+      systemSettings: newSettings.systemSettings,
+      notificationSettings: newSettings.notificationSettings
+    };
+    
+    await dbOperations.put(STORES.SETTINGS, settingsToStore);
+    set(newSettings);
   },
 
   addQuickCategory: async (category) => {

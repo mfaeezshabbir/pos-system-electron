@@ -22,6 +22,7 @@ import useSettingsStore from "../../stores/useSettingsStore";
 import ReceiptPreviewDialog from "./ReceiptPreviewDialog";
 import useTransactionStore from "../../stores/useTransactionStore";
 import { Receipt, Print } from "@mui/icons-material";
+import useCustomerStore from "../../stores/useCustomerStore";
 
 const PaymentDialog = ({ open, onClose, total, customer }) => {
   const [paymentMethod, setPaymentMethod] = React.useState("cash");
@@ -30,18 +31,34 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
   const [showReceipt, setShowReceipt] = React.useState(false);
   const [currentTransaction, setCurrentTransaction] = React.useState(null);
   const { completeTransaction, items } = useCartStore();
+  const { customers, initializeCustomers } = useCustomerStore();
   const { receiptSettings } = useSettingsStore();
   const [paymentComplete, setPaymentComplete] = React.useState(false);
+
+  React.useEffect(() => {
+    initializeCustomers();
+  }, []);
 
   React.useEffect(() => {
     if (open) {
       setAmountPaid("");
       setError("");
-      setPaymentMethod("cash");
+      setPaymentMethod(customer?.id === "walk-in" ? "cash" : "khata");
       setShowReceipt(false);
       setCurrentTransaction(null);
     }
-  }, [open]);
+  }, [open, customer]);
+
+  const validateKhataPayment = async () => {
+    if (paymentMethod === "khata" && customer) {
+      const customerData = customers.find((c) => c.id === customer.id);
+      if (!customerData) {
+        setError("Customer not found");
+        return false;
+      }
+    }
+    return true;
+  };
 
   const handleSubmit = async () => {
     try {
@@ -52,6 +69,9 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
         setError("Amount paid must be greater than or equal to total");
         return;
       }
+
+      const isValidKhata = await validateKhataPayment();
+      if (!isValidKhata) return;
 
       const paymentDetails = {
         method: paymentMethod,
@@ -73,7 +93,8 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
         setPaymentComplete(true);
       }
     } catch (error) {
-      setError(error.message);
+      console.error("Error processing payment:", error);
+      setError(error.message || "Failed to process payment");
     }
   };
 

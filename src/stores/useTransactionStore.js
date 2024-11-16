@@ -1,172 +1,128 @@
 import { create } from 'zustand'
 import { dbOperations, STORES } from '../utils/db'
 import dayjs from 'dayjs'
-import useDashboardStore from './useDashboardStore'
-import useSyncStore from './useSyncStore'
+import useCustomerStore from './useCustomerStore'
 
 const useTransactionStore = create((set, get) => ({
-  transactions: [],
-  loading: false,
-  error: null,
+    transactions: [],
+    loading: false,
+    error: null,
 
-  // Load transactions
-  loadTransactions: async () => {
-    set({ loading: true })
-    try {
-      const transactions = await dbOperations.getAll(STORES.TRANSACTIONS)
-      set({ transactions: transactions || [], loading: false, error: null })
-      return transactions
-    } catch (error) {
-      set({ error: error.message, loading: false, transactions: [] })
-      return []
+    loadTransactions: async () => {
+        try {
+            set({ loading: true });
+            const transactions = await dbOperations.getAll(STORES.TRANSACTIONS);
+            set({ transactions, loading: false });
+        } catch (error) {
+            console.error('Failed to load transactions:', error);
+            set({ error: error.message, loading: false });
+        }
+    },
+
+    getSalesSummary: (startDate, endDate) => {
+        const transactions = get().transactions.filter(transaction => {
+            const transactionDate = dayjs(transaction.timestamp);
+            return transactionDate.isSameOrAfter(startDate, 'day') && 
+                   transactionDate.isSameOrBefore(endDate, 'day') &&
+                   (transaction.status === 'completed' || transaction.paymentMethod !== 'khata');
+        });
+
+        return transactions.reduce((summary, transaction) => {
+            return {
+                totalRevenue: summary.totalRevenue + (transaction.total || 0),
+                netSales: summary.netSales + ((transaction.total || 0) - (transaction.tax || 0)),
+                taxAmount: summary.taxAmount + (transaction.tax || 0),
+                discountAmount: summary.discountAmount + (transaction.discount || 0),
+                transactionCount: summary.transactionCount + 1
+            };
+        }, {
+            totalRevenue: 0,
+            netSales: 0,
+            taxAmount: 0,
+            discountAmount: 0,
+            transactionCount: 0
+        });
+    },
+
+    getPaymentMethodSummary: (startDate, endDate) => {
+        const transactions = get().transactions.filter(transaction => {
+            const transactionDate = dayjs(transaction.timestamp);
+            return transactionDate.isSameOrAfter(startDate, 'day') && 
+                   transactionDate.isSameOrBefore(endDate, 'day') &&
+                   (transaction.status === 'completed' || transaction.paymentMethod !== 'khata');
+        });
+
+        return transactions.reduce((summary, transaction) => {
+            const method = transaction.paymentMethod || 'unknown';
+            return {
+                ...summary,
+                [method]: (summary[method] || 0) + (transaction.total || 0)
+            };
+        }, {});
+    },
+
+    addTransaction: async (transaction) => {
+        try {
+            set({ loading: true });
+            await dbOperations.add(STORES.TRANSACTIONS, transaction);
+            set(state => ({
+                transactions: [transaction, ...state.transactions],
+                loading: false
+            }));
+            return true;
+        } catch (error) {
+            console.error('Failed to add transaction:', error);
+            set({ error: error.message, loading: false });
+            return false;
+        }
+    },
+
+    clearAllTransactions: async () => {
+        try {
+            set({ loading: true });
+            await dbOperations.clearStore(STORES.TRANSACTIONS);
+            set({ transactions: [], loading: false });
+            return true;
+        } catch (error) {
+            console.error('Failed to clear transactions:', error);
+            set({ error: error.message, loading: false });
+            return false;
+        }
+    },
+
+    updateTransactionStatus: async (transactionId, newStatus) => {
+        try {
+            const transaction = await dbOperations.get(STORES.TRANSACTIONS, transactionId);
+            if (!transaction) return false;
+
+            const updatedTransaction = {
+                ...transaction,
+                status: newStatus
+            };
+
+            await dbOperations.put(STORES.TRANSACTIONS, updatedTransaction);
+            
+            set(state => ({
+                transactions: state.transactions.map(t =>
+                    t.id === transactionId ? updatedTransaction : t
+                )
+            }));
+
+            if (transaction.paymentMethod === 'khata' && transaction.customer?.id) {
+                const customerStore = useCustomerStore.getState();
+                await customerStore.updateTransactionPaymentStatus(
+                    transaction.customer.id,
+                    transactionId,
+                    newStatus === 'completed'
+                );
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Failed to update transaction status:', error);
+            return false;
+        }
     }
-  },
+}));
 
-  // Add transaction with proper updates
-  addTransaction: async (transaction) => {
-    set({ loading: true })
-    try {
-      await dbOperations.add(STORES.TRANSACTIONS, transaction)
-      
-      // Update dashboard stats first
-      const dashboardStore = useDashboardStore.getState()
-      dashboardStore.updateSalesData(transaction)
-      
-      // Then update transaction list
-      set(state => ({
-        transactions: [transaction, ...state.transactions],
-        loading: false,
-        error: null
-      }))
-      
-      // After successful transaction add
-      useSyncStore.getState().broadcastUpdate('TRANSACTION_UPDATE', {
-        action: 'add',
-        transactionId: transaction.id
-      })
-      
-      return true
-    } catch (error) {
-      set({ error: error.message, loading: false })
-      return false
-    }
-  },
-
-  // Get recent transactions
-  getRecentTransactions: async (limit = 5) => {
-    try {
-      const transactions = await dbOperations.query(STORES.TRANSACTIONS, {
-        sort: (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
-        limit
-      })
-      return transactions
-    } catch (error) {
-      set({ error: error.message })
-      return []
-    }
-  },
-
-  // Get transactions by date range
-  getTransactionsByDateRange: async (startDate, endDate) => {
-    try {
-      const range = IDBKeyRange.bound(startDate.toISOString(), endDate.toISOString())
-      return await dbOperations.query(STORES.TRANSACTIONS, {
-        index: 'timestamp',
-        range
-      })
-    } catch (error) {
-      set({ error: error.message })
-      return []
-    }
-  },
-
-  // Get customer transactions
-  getCustomerTransactions: async (customerId) => {
-    try {
-      return await dbOperations.getByIndex(STORES.TRANSACTIONS, 'customerId', customerId)
-    } catch (error) {
-      set({ error: error.message })
-      return []
-    }
-  },
-
-  // Clear old transactions
-  clearOldTransactions: async (daysToKeep = 30) => {
-    try {
-      const cutoffDate = new Date()
-      cutoffDate.setDate(cutoffDate.getDate() - daysToKeep)
-
-      const transactions = await dbOperations.getAll(STORES.TRANSACTIONS)
-      const recentTransactions = transactions.filter(
-        t => new Date(t.timestamp) >= cutoffDate
-      )
-
-      await dbOperations.clear(STORES.TRANSACTIONS)
-      await Promise.all(recentTransactions.map(t => 
-        dbOperations.add(STORES.TRANSACTIONS, t)
-      ))
-
-      set({ transactions: recentTransactions, error: null })
-    } catch (error) {
-      set({ error: error.message })
-    }
-  },
-
-  getSalesSummary: (startDate, endDate) => {
-    const transactions = get().transactions;
-    const filteredTransactions = transactions.filter(t => {
-      const date = dayjs(t.timestamp);
-      return date.isAfter(startDate, 'day') && date.isBefore(endDate, 'day');
-    });
-
-    return {
-      totalRevenue: filteredTransactions.reduce((sum, t) => sum + t.total, 0),
-      netSales: filteredTransactions.reduce((sum, t) => sum + t.subtotal, 0),
-      taxAmount: filteredTransactions.reduce((sum, t) => sum + t.taxAmount, 0),
-      discountAmount: filteredTransactions.reduce((sum, t) => sum + (t.discountAmount || 0), 0),
-      transactionCount: filteredTransactions.length
-    };
-  },
-
-  getPaymentMethodSummary: (startDate, endDate) => {
-    const transactions = get().transactions;
-    const filteredTransactions = transactions.filter(t => {
-      const date = dayjs(t.timestamp);
-      return date.isAfter(startDate, 'day') && date.isBefore(endDate, 'day');
-    });
-
-    return filteredTransactions.reduce((summary, t) => {
-      const method = t.paymentMethod;
-      if (!summary[method]) {
-        summary[method] = { total: 0, count: 0 };
-      }
-      summary[method].total += t.total;
-      summary[method].count += 1;
-      return summary;
-    }, {});
-  },
-
-  // Add this method to the store
-  clearAllTransactions: async () => {
-    set({ loading: true });
-    try {
-      await dbOperations.clear(STORES.TRANSACTIONS);
-      set({ 
-        transactions: [],
-        loading: false,
-        error: null 
-      });
-      // Reset dashboard stats
-      useDashboardStore.getState().resetDailyStats();
-      return true;
-    } catch (error) {
-      set({ 
-        error: error.message, 
-        loading: false 
-      });
-      return false;
-    }
-  }
-}))
-
-export default useTransactionStore 
+export default useTransactionStore; 

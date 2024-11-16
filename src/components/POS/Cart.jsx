@@ -193,11 +193,12 @@ const Cart = () => {
   } = useCartStore();
 
   const inventory = useInventoryStore();
+  const { posSettings } = useSettingsStore();
   const [paymentDialogOpen, setPaymentDialogOpen] = React.useState(false);
   const [customerDialogOpen, setCustomerDialogOpen] = React.useState(false);
   const [customerMenuAnchor, setCustomerMenuAnchor] = React.useState(null);
-  const totals = getCartTotals();
-  const { posSettings } = useSettingsStore();
+  
+  const totals = getCartTotals(posSettings.defaultTaxRate);
 
   const handleQuantityChange = (item, newQuantity) => {
     if (newQuantity > 0) {

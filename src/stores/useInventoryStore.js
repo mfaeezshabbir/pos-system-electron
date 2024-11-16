@@ -29,23 +29,34 @@ const useInventoryStore = create((set, get) => ({
   initializeInventory: async () => {
     set({ loading: true })
     try {
+      // Load products
       const products = await dbOperations.getAll(STORES.PRODUCTS)
-      const categories = await dbOperations.get(STORES.SETTINGS, 'categories') || []
-      set({
-        products: products || [],
-        categories,
-        loading: false,
-        error: null
+      console.log('Loaded products from DB:', products)
+
+      // Load categories from settings
+      const settings = await dbOperations.get(STORES.SETTINGS, 'appSettings')
+      console.log('Loaded settings from DB:', settings)
+      const categories = settings?.categories || []
+      console.log('Extracted categories:', categories)
+
+      set({ 
+        products: products || [], 
+        categories: categories,
+        loading: false, 
+        error: null 
       })
     } catch (error) {
+      console.error('Failed to initialize inventory:', error)
       set({ error: error.message, loading: false })
     }
   },
 
   // Add product
   addProduct: async (product) => {
+    console.log('Starting product addition:', product)
     const errors = validateProduct(product)
     if (errors.length > 0) {
+      console.log('Validation errors:', errors)
       set({ error: errors.join(', ') })
       return false
     }
@@ -58,20 +69,29 @@ const useInventoryStore = create((set, get) => ({
         image: product.image || DEFAULT_PRODUCT_IMAGE,
         createdAt: new Date().toISOString()
       }
+      console.log('Attempting to save product to DB:', newProduct)
 
       await dbOperations.add(STORES.PRODUCTS, newProduct)
-      await dbOperations.add(STORES.PRODUCTS, newProduct)
-      set(state => ({
-        products: [...state.products, newProduct],
-        loading: false,
-        error: null
-      }))
+      console.log('Product saved to DB successfully')
+
+      set(state => {
+        console.log('Updating store state with new product')
+        return {
+          products: [...state.products, newProduct],
+          loading: false,
+          error: null
+        }
+      })
+
+      console.log('Broadcasting update')
       useSyncStore.getState().broadcastUpdate('INVENTORY_UPDATE', {
         action: 'add',
         productId: newProduct.id
       })
+
       return true
     } catch (error) {
+      console.error('Error adding product:', error)
       set({ error: error.message, loading: false })
       return false
     }
@@ -124,39 +144,79 @@ const useInventoryStore = create((set, get) => ({
 
   // Category operations
   addCategory: async (category) => {
+    console.log('Starting addCategory with:', category)
     try {
-      const categories = get().categories
+      const categories = get().categories || []
       const updatedCategories = [...categories, category]
-      await dbOperations.put(STORES.SETTINGS, {
-        id: 'categories',
-        value: updatedCategories
-      })
+      console.log('Saving categories to DB:', updatedCategories)
+      
+      // First get existing settings
+      const existingSettings = await dbOperations.get(STORES.SETTINGS, 'appSettings') || {}
+      console.log('Existing settings:', existingSettings)
+      
+      // Update settings with new categories
+      const updatedSettings = {
+        ...existingSettings,
+        id: 'appSettings',
+        categories: updatedCategories
+      }
+      
+      // Save to database
+      await dbOperations.put(STORES.SETTINGS, updatedSettings)
+      console.log('Saved settings to DB:', updatedSettings)
+      
+      // Update local state
       set(state => ({
         categories: updatedCategories,
         error: null
       }))
+      
+      // Broadcast update
+      useSyncStore.getState().broadcastUpdate('INVENTORY_UPDATE', {
+        action: 'updateCategories'
+      })
+      
       return true
     } catch (error) {
+      console.error('Error in addCategory:', error)
       set({ error: error.message })
       return false
     }
   },
 
-  // Delete category
   deleteCategory: async (category) => {
+    console.log('Starting deleteCategory with:', category)
     try {
-      const categories = get().categories
+      const categories = get().categories || []
       const updatedCategories = categories.filter(cat => cat !== category)
-      await dbOperations.put(STORES.SETTINGS, {
-        id: 'categories',
-        value: updatedCategories
-      })
+      
+      // First get existing settings
+      const existingSettings = await dbOperations.get(STORES.SETTINGS, 'appSettings') || {}
+      
+      // Update settings with new categories
+      const updatedSettings = {
+        ...existingSettings,
+        id: 'appSettings',
+        categories: updatedCategories
+      }
+      
+      // Save to database
+      await dbOperations.put(STORES.SETTINGS, updatedSettings)
+      
+      // Update local state
       set(state => ({
         categories: updatedCategories,
         error: null
       }))
+      
+      // Broadcast update
+      useSyncStore.getState().broadcastUpdate('INVENTORY_UPDATE', {
+        action: 'updateCategories'
+      })
+      
       return true
     } catch (error) {
+      console.error('Error in deleteCategory:', error)
       set({ error: error.message })
       return false
     }
@@ -398,6 +458,13 @@ const useInventoryStore = create((set, get) => ({
       console.error('Failed to get product history:', error)
       return []
     }
+  },
+
+  // Add this method to help with debugging
+  getCategories: () => {
+    const state = get()
+    console.log('Current categories in state:', state.categories)
+    return state.categories
   }
 }))
 

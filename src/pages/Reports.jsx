@@ -29,6 +29,8 @@ import {
   Download,
   Category,
   DeleteForever,
+  CheckCircle,
+  Payment,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import useTransactionStore from "../stores/useTransactionStore";
@@ -56,6 +58,7 @@ const Reports = () => {
     transactions,
     loadTransactions,
     clearAllTransactions,
+    updateTransactionStatus,
   } = useTransactionStore();
   const { products, categories } = useInventoryStore();
 
@@ -80,11 +83,11 @@ const Reports = () => {
   // Helper function to filter transactions
   const filterAndSetTransactions = React.useCallback(
     (transactions) => {
-      const filtered = transactions.filter(
-        (transaction) =>
-          dayjs(transaction.timestamp).isAfter(startDate, "day") &&
-          dayjs(transaction.timestamp).isBefore(dayjs(endDate).endOf("day"))
-      );
+      const filtered = transactions.filter((transaction) => {
+        const transactionDate = dayjs(transaction.timestamp);
+        return transactionDate.isSameOrAfter(startDate, 'day') && 
+               transactionDate.isSameOrBefore(endDate, 'day');
+      });
       setFilteredTransactions(filtered);
     },
     [startDate, endDate]
@@ -124,9 +127,19 @@ const Reports = () => {
     if (confirmed) {
       const success = await clearAllTransactions();
       if (success) {
-        // Reset dashboard stats
-        useDashboardStore.getState().resetDailyStats();
+        // Reset all dashboard stats
+        const dashboardStore = useDashboardStore.getState();
+        await dashboardStore.resetDailyStats();
+        await dashboardStore.updateSalesTrends();
+        
+        // Clear local state
         setFilteredTransactions([]);
+        
+        // Show notification
+        useNotificationStore.getState().showNotification({
+          message: 'All transactions have been cleared',
+          type: 'success'
+        });
       }
     }
   };
@@ -158,6 +171,31 @@ const Reports = () => {
         message: 'Stock adjusted successfully'
       });
       handleStockAdjustmentClose();
+    }
+  };
+
+  const handleToggleStatus = async (transaction) => {
+    try {
+      if (transaction.paymentMethod !== 'khata') return;
+      
+      const newStatus = transaction.status === 'completed' ? 'unpaid' : 'completed';
+      const success = await useTransactionStore.getState().updateTransactionStatus(
+        transaction.id,
+        newStatus
+      );
+      
+      if (success) {
+        useNotificationStore.getState().addNotification({
+          type: 'success',
+          message: `Transaction marked as ${newStatus}`
+        });
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      useNotificationStore.getState().addNotification({
+        type: 'error',
+        message: 'Failed to update status'
+      });
     }
   };
 
@@ -222,6 +260,7 @@ const Reports = () => {
                   <TableCell align="right">Amount</TableCell>
                   <TableCell>Payment Method</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -246,6 +285,19 @@ const Reports = () => {
                         }
                         size="small"
                       />
+                    </TableCell>
+                    <TableCell align="center">
+                      {transaction.paymentMethod === 'khata' && (
+                        <Button
+                          size="small"
+                          variant={transaction.status === 'completed' ? 'outlined' : 'contained'}
+                          color={transaction.status === 'completed' ? 'success' : 'primary'}
+                          onClick={() => handleToggleStatus(transaction)}
+                          startIcon={transaction.status === 'completed' ? <CheckCircle /> : <Payment />}
+                        >
+                          {transaction.status === 'completed' ? 'Paid' : 'Mark as Paid'}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

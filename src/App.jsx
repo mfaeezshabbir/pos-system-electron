@@ -34,7 +34,8 @@ import { dbOperations } from "./utils/db";
 import useSyncStore from "./stores/useSyncStore";
 
 function App() {
-  const [dbInitialized, setDbInitialized] = React.useState(false);
+  const [isInitialized, setIsInitialized] = React.useState(false);
+  const [error, setError] = React.useState(null);
   const { systemSettings } = useSettingsStore();
 
   const theme = React.useMemo(
@@ -48,44 +49,18 @@ function App() {
   );
 
   React.useEffect(() => {
-    let mounted = true;
-
     const initializeApp = async () => {
       try {
-        // Initialize database and wait for completion
-        const db = await initDB();
-
-        if (!mounted) return;
-
-        // Initialize stores sequentially
-        await useSettingsStore.getState().initializeSettings();
-        if (!mounted) return;
-
-        await useCustomerStore.getState().initializeCustomers();
-        if (!mounted) return;
-
-        await useDashboardStore.getState().initializeDashboard();
-        if (!mounted) return;
-
+        await initDB();
         await useInventoryStore.getState().initializeInventory();
-        if (!mounted) return;
-
-        await useDashboardStore.getState().scheduleDailyReset();
-        if (!mounted) return;
-
-        await dbOperations.getAllUsers();
-
-        setDbInitialized(true);
+        setIsInitialized(true);
       } catch (error) {
-        console.error("Failed to initialize app:", error);
+        console.error('Failed to initialize app:', error);
+        setError(error);
       }
     };
 
     initializeApp();
-
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   React.useEffect(() => {
@@ -105,21 +80,12 @@ function App() {
     }
   }, []);
 
-  if (!dbInitialized) {
-    return (
-      <ThemeProvider theme={theme}>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100vh",
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      </ThemeProvider>
-    );
+  if (error) {
+    return <div>Error initializing app: {error.message}</div>;
+  }
+
+  if (!isInitialized) {
+    return <div>Loading...</div>;
   }
 
   return (

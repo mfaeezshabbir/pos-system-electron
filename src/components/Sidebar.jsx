@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react";
 import {
   Drawer,
   List,
@@ -9,8 +9,8 @@ import {
   Box,
   Typography,
   Divider,
-  Avatar
-} from '@mui/material'
+  Avatar,
+} from "@mui/material";
 import {
   Dashboard,
   ShoppingCart,
@@ -18,63 +18,64 @@ import {
   Assessment,
   Settings,
   Person,
-  People
-} from '@mui/icons-material'
-import { useNavigate, useLocation } from 'react-router-dom'
-import useSettingsStore from '../stores/useSettingsStore'
-import useAuthStore from '../stores/useAuthStore'
-import { ROLES } from '../stores/useAuthStore'
+  People,
+} from "@mui/icons-material";
+import { useNavigate, useLocation } from "react-router-dom";
+import useSettingsStore from "../stores/useSettingsStore";
+import useAuthStore from "../stores/useAuthStore";
+import { ROLES } from "../stores/useAuthStore";
 
-const DRAWER_WIDTH = 240
+const DRAWER_WIDTH = 240;
 
 const menuItems = [
   {
-    text: 'Dashboard',
+    text: "Dashboard",
     icon: <Dashboard />,
-    path: '/dashboard',
-    roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.CASHIER]
+    path: "/dashboard",
+    roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.CASHIER],
   },
   {
-    text: 'POS',
+    text: "POS",
     icon: <ShoppingCart />,
-    path: '/pos',
-    roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.CASHIER]
+    path: "/pos",
+    roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.CASHIER],
   },
   {
-    text: 'Inventory',
+    text: "Inventory",
     icon: <Inventory />,
-    path: '/inventory',
-    roles: [ROLES.ADMIN, ROLES.MANAGER]
+    path: "/inventory",
+    roles: [ROLES.ADMIN, ROLES.MANAGER],
   },
   {
-    text: 'Reports',
+    text: "Reports",
     icon: <Assessment />,
-    path: '/reports',
-    roles: [ROLES.ADMIN, ROLES.MANAGER]
+    path: "/reports",
+    roles: [ROLES.ADMIN, ROLES.MANAGER],
   },
+
   {
-    text: 'Settings',
-    icon: <Settings />,
-    path: '/settings',
-    roles: [ROLES.ADMIN, ROLES.MANAGER]
-  },
-  {
-    text: 'Customers',
+    text: "Customers",
     icon: <People />,
-    path: '/customers',
-    roles: [ROLES.ADMIN, ROLES.MANAGER]
-  }
-]
+    path: "/customers",
+    roles: [ROLES.ADMIN, ROLES.MANAGER],
+  },
+  {
+    text: "Settings",
+    icon: <Settings />,
+    path: "/settings",
+    roles: [ROLES.ADMIN, ROLES.MANAGER],
+  },
+];
 
 const Sidebar = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { currentUser } = useAuthStore()
-  const businessInfo = useSettingsStore(state => state.businessInfo)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { currentUser } = useAuthStore();
+  const businessInfo = useSettingsStore((state) => state.businessInfo);
 
-  const filteredMenuItems = menuItems.filter(item =>
+  const filteredMenuItems = menuItems.filter((item) =>
     item.roles.includes(currentUser?.role)
-  )
+  );
 
   return (
     <Drawer
@@ -82,9 +83,9 @@ const Sidebar = () => {
       sx={{
         width: DRAWER_WIDTH,
         flexShrink: 0,
-        '& .MuiDrawer-paper': {
+        "& .MuiDrawer-paper": {
           width: DRAWER_WIDTH,
-          boxSizing: 'border-box',
+          boxSizing: "border-box",
         },
       }}
     >
@@ -93,11 +94,16 @@ const Sidebar = () => {
           <img
             src={businessInfo.logo}
             alt="Business Logo"
-            style={{ width: '100%', height: 'auto', maxHeight: 60, objectFit: 'contain' }}
+            style={{
+              width: "100%",
+              height: "auto",
+              maxHeight: 60,
+              objectFit: "contain",
+            }}
           />
         ) : (
           <Typography variant="h6" noWrap component="div">
-            {businessInfo.name || 'POS System'}
+            {businessInfo.name || "POS System"}
           </Typography>
         )}
       </Box>
@@ -105,16 +111,16 @@ const Sidebar = () => {
       <Divider />
 
       {/* User Profile Section */}
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 2 }}>
         <Avatar
           src={currentUser?.profilePic}
           sx={{
             width: 40,
             height: 40,
-            bgcolor: 'primary.main',
-            cursor: 'pointer'
+            bgcolor: "primary.main",
+            cursor: "pointer",
           }}
-          onClick={() => navigate('/profile')}
+          onClick={() => navigate("/profile")}
         >
           {!currentUser?.profilePic && currentUser?.name?.[0]?.toUpperCase()}
         </Avatar>
@@ -123,7 +129,8 @@ const Sidebar = () => {
             {currentUser?.name}
           </Typography>
           <Typography variant="caption" color="textSecondary" noWrap>
-            {currentUser?.role?.charAt(0).toUpperCase() + currentUser?.role?.slice(1)}
+            {currentUser?.role?.charAt(0).toUpperCase() +
+              currentUser?.role?.slice(1)}
           </Typography>
         </Box>
       </Box>
@@ -137,28 +144,26 @@ const Sidebar = () => {
               selected={location.pathname === item.path}
               onClick={() => navigate(item.path)}
               sx={{
-                '&.Mui-selected': {
-                  backgroundColor: 'primary.main',
-                  color: 'primary.contrastText',
-                  '&:hover': {
-                    backgroundColor: 'primary.dark',
+                "&.Mui-selected": {
+                  backgroundColor: "primary.main",
+                  color: "primary.contrastText",
+                  "&:hover": {
+                    backgroundColor: "primary.dark",
                   },
-                  '& .MuiListItemIcon-root': {
-                    color: 'primary.contrastText',
+                  "& .MuiListItemIcon-root": {
+                    color: "primary.contrastText",
                   },
                 },
               }}
             >
-              <ListItemIcon sx={{ color: 'inherit' }}>
-                {item.icon}
-              </ListItemIcon>
+              <ListItemIcon sx={{ color: "inherit" }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
           </ListItem>
         ))}
       </List>
     </Drawer>
-  )
-}
+  );
+};
 
-export default Sidebar 
+export default Sidebar;

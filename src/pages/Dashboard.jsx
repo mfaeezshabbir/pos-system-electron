@@ -15,6 +15,7 @@ import {
   ListItemText,
   ListItemAvatar,
   Tooltip,
+  Chip,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -191,39 +192,27 @@ const Dashboard = () => {
   // Load initial data and subscribe to updates
   React.useEffect(() => {
     const init = async () => {
-      await useTransactionStore.getState().loadTransactions();
-      const initialTransactions = useTransactionStore.getState().transactions;
+      setLoading(true);
 
-      // Get today's transactions for stats
-      const today = dayjs().startOf("day");
-      const todayTransactions = initialTransactions.filter((t) =>
-        dayjs(t.timestamp).isAfter(today)
-      );
+      // Initialize dashboard first
+      await useDashboardStore.getState().initializeDashboard();
 
-      // Reset and calculate fresh daily stats
-      useDashboardStore.getState().resetDailyStats();
-      todayTransactions.forEach((transaction) => {
-        useDashboardStore.getState().updateSalesData(transaction);
-      });
+      // Load transactions only if not already loaded
+      const transactionStore = useTransactionStore.getState();
+      if (!transactionStore.transactions.length) {
+        await transactionStore.loadTransactions();
+      }
 
       // Set recent transactions
-      setRecentTransactions(initialTransactions.slice(0, 5));
+      setRecentTransactions(transactionStore.transactions.slice(0, 5));
+      setLoading(false);
     };
+
     init();
 
     const unsubscribe = useTransactionStore.subscribe((state, prevState) => {
-      // Only update if transactions actually changed
       if (state.transactions !== prevState?.transactions) {
         setRecentTransactions(state.transactions.slice(0, 5));
-
-        // Update today's stats if needed
-        const latestTransaction = state.transactions[0];
-        if (
-          latestTransaction &&
-          dayjs(latestTransaction.timestamp).isAfter(dayjs().startOf("day"))
-        ) {
-          useDashboardStore.getState().updateSalesData(latestTransaction);
-        }
       }
     });
 
@@ -315,25 +304,83 @@ const Dashboard = () => {
               <List>
                 {recentTransactions.map((transaction) => (
                   <React.Fragment key={transaction.id}>
-                    <ListItem>
+                    <ListItem
+                      secondaryAction={
+                        <Stack direction="row" spacing={2} alignItems="center">
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            {formatCurrency(transaction.total)}
+                          </Typography>
+                          {transaction.paymentMethod === "khata" && (
+                            <Chip
+                              size="small"
+                              label={
+                                transaction.status === "completed"
+                                  ? "Paid"
+                                  : "Unpaid"
+                              }
+                              color={
+                                transaction.status === "completed"
+                                  ? "success"
+                                  : "warning"
+                              }
+                              sx={{ minWidth: 80 }}
+                            />
+                          )}
+                        </Stack>
+                      }
+                    >
                       <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: "primary.light" }}>
+                        <Avatar
+                          sx={{
+                            bgcolor:
+                              transaction.paymentMethod === "khata"
+                                ? transaction.status === "completed"
+                                  ? "success.light"
+                                  : "warning.light"
+                                : "primary.light",
+                          }}
+                        >
                           <ShoppingCart />
                         </Avatar>
                       </ListItemAvatar>
                       <ListItemText
                         primary={
-                          <Typography variant="subtitle2">
-                            Order #{transaction.id}
-                          </Typography>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                          >
+                            <Typography variant="subtitle2">
+                              Order #{transaction.id.slice(-4)}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              ({transaction.paymentMethod})
+                            </Typography>
+                          </Stack>
                         }
-                        secondary={new Date(
-                          transaction.timestamp
-                        ).toLocaleString()}
+                        secondary={
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                          >
+                            <Typography variant="body2" color="text.secondary">
+                              {new Date(transaction.timestamp).toLocaleString()}
+                            </Typography>
+                            {transaction.paymentMethod === "khata" && (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                ({transaction.status})
+                              </Typography>
+                            )}
+                          </Stack>
+                        }
                       />
-                      <Typography variant="subtitle1" fontWeight="bold">
-                        {formatCurrency(transaction.total)}
-                      </Typography>
                     </ListItem>
                     <Divider variant="inset" component="li" />
                   </React.Fragment>

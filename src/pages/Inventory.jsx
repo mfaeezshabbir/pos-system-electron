@@ -99,6 +99,11 @@ const Inventory = () => {
               variant="outlined"
               startIcon={<Category />}
               onClick={() => setIsCategoryDialogOpen(true)}
+              inert={
+                isFormOpen || isCategoryDialogOpen || deleteConfirmOpen
+                  ? ""
+                  : undefined
+              }
             >
               Manage Categories
             </Button>
@@ -109,6 +114,11 @@ const Inventory = () => {
               variant="contained"
               startIcon={<Add />}
               onClick={() => setIsFormOpen(true)}
+              inert={
+                isFormOpen || isCategoryDialogOpen || deleteConfirmOpen
+                  ? ""
+                  : undefined
+              }
             >
               Add Product
             </Button>
@@ -122,13 +132,26 @@ const Inventory = () => {
           onChange={(e) => setSearchQuery(e.target.value)}
           onClear={() => setSearchQuery("")}
           placeholder="Search products..."
+          inert={
+            isFormOpen || isCategoryDialogOpen || deleteConfirmOpen
+              ? ""
+              : undefined
+          }
         />
       </Box>
 
       {canAccessImportExport ? (
         <>
           <Paper sx={{ width: "100%", mb: 2 }}>
-            <Tabs value={tab} onChange={handleTabChange}>
+            <Tabs
+              value={tab}
+              onChange={handleTabChange}
+              inert={
+                isFormOpen || isCategoryDialogOpen || deleteConfirmOpen
+                  ? ""
+                  : undefined
+              }
+            >
               <Tab label="Products" />
               <Tab label="Import/Export" />
             </Tabs>
@@ -146,10 +169,23 @@ const Inventory = () => {
               onEdit={handleEditClick}
               onDelete={handleDeleteClick}
               userRole={currentUser?.role}
+              inert={
+                isFormOpen || isCategoryDialogOpen || deleteConfirmOpen
+                  ? ""
+                  : undefined
+              }
             />
           )}
 
-          {tab === 1 && <CsvUploader />}
+          {tab === 1 && (
+            <CsvUploader
+              inert={
+                isFormOpen || isCategoryDialogOpen || deleteConfirmOpen
+                  ? ""
+                  : undefined
+              }
+            />
+          )}
         </>
       ) : (
         <ProductList
@@ -161,6 +197,11 @@ const Inventory = () => {
           onEdit={handleEditClick}
           onDelete={handleDeleteClick}
           userRole={currentUser?.role}
+          inert={
+            isFormOpen || isCategoryDialogOpen || deleteConfirmOpen
+              ? ""
+              : undefined
+          }
         />
       )}
 
@@ -172,24 +213,29 @@ const Inventory = () => {
           setSelectedProduct(null);
         }}
         onSubmit={async (formData) => {
-          const success = selectedProduct
-            ? await updateProduct({ ...formData, id: selectedProduct.id })
-            : await addProduct(formData);
+          try {
+            const success = selectedProduct
+              ? await updateProduct(selectedProduct.id, formData)
+              : await addProduct(formData);
 
-          if (success) {
-            setIsFormOpen(false);
-            setSelectedProduct(null);
+            if (success) {
+              setIsFormOpen(false);
+              setSelectedProduct(null);
+              useNotificationStore.getState().addNotification({
+                type: "success",
+                message: `Product ${selectedProduct ? "updated" : "added"} successfully`,
+              });
+            } else {
+              console.error('Failed to save product');
+              useNotificationStore.getState().addNotification({
+                message: `Failed to ${selectedProduct ? "update" : "add"} product`,
+                type: "error",
+              });
+            }
+          } catch (error) {
+            console.error('Error saving product:', error);
             useNotificationStore.getState().addNotification({
-              type: "success",
-              message: `Product ${
-                selectedProduct ? "updated" : "added"
-              } successfully`,
-            });
-          } else {
-            useNotificationStore.getState().addNotification({
-              message: `Failed to ${
-                selectedProduct ? "update" : "add"
-              } product`,
+              message: `Error: ${error.message}`,
               type: "error",
             });
           }

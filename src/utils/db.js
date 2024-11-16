@@ -23,16 +23,22 @@ export const initDB = async () => {
   try {
     if (db) return db;
 
-    try {
-      await deleteDB(DB_NAME);
-    } catch (e) {
-      console.warn('Failed to delete existing database:', e);
-    }
-
     db = await openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
         console.log('Running database upgrade...');
-
+        
+        // Create stores if they don't exist
+        if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
+          const settingsStore = db.createObjectStore(STORES.SETTINGS, { keyPath: 'id' });
+          
+          // Initialize default settings with empty categories
+          settingsStore.put({
+            id: 'appSettings',
+            categories: [],
+            // ... other settings
+          });
+        }
+        
         // Create all stores and their indexes in the upgrade transaction
         Object.values(STORES).forEach(storeName => {
           if (!db.objectStoreNames.contains(storeName)) {
@@ -69,6 +75,16 @@ export const initDB = async () => {
                 recentTransactions: []
               });
             }
+
+            // Initialize categories if they don't exist
+            store.get('categories').then(categories => {
+              if (!categories) {
+                store.put({
+                  id: 'categories',
+                  value: []
+                });
+              }
+            });
           }
         });
       },
@@ -164,8 +180,19 @@ export const dbOperations = {
   },
 
   async add(storeName, item) {
+    console.log(`Adding item to ${storeName}:`, item);
     const db = await initDB();
-    return db.add(storeName, item);
+    try {
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const result = await store.add(item);
+      await tx.done; // Wait for transaction to complete
+      console.log(`Successfully added item to ${storeName}:`, result);
+      return result;
+    } catch (error) {
+      console.error(`Failed to add item to ${storeName}:`, error);
+      throw error;
+    }
   },
 
   async get(storeName, id) {
@@ -175,7 +202,16 @@ export const dbOperations = {
 
   async getAll(storeName) {
     const db = await initDB();
-    return db.getAll(storeName);
+    try {
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const results = await store.getAll();
+      await tx.done;
+      return results;
+    } catch (error) {
+      console.error(`Failed to get all items from ${storeName}:`, error);
+      throw error;
+    }
   },
 
   async put(storeName, item) {

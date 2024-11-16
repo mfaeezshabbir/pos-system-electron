@@ -24,7 +24,7 @@ const useCustomerStore = create((set, get) => ({
         id: Date.now().toString(),
         name: customer.name,
         phone: customer.phone,
-        creditLimit: customer.creditLimit || 0,
+        creditLimit: 0,
         currentCredit: 0,
         transactions: [],
         createdAt: new Date().toISOString()
@@ -63,34 +63,32 @@ const useCustomerStore = create((set, get) => ({
   },
 
   addKhataTransaction: async (customerId, transaction) => {
-    const customer = await dbOperations.get(STORES.CUSTOMERS, customerId)
-    if (!customer) return false
-
-    const newTotal = customer.currentCredit + transaction.total
-    if (newTotal > customer.creditLimit) return false
+    const customer = await dbOperations.get(STORES.CUSTOMERS, customerId);
+    if (!customer) return false;
 
     try {
       const updatedCustomer = {
         ...customer,
-        currentCredit: newTotal,
+        currentCredit: customer.currentCredit + transaction.total,
         transactions: [...customer.transactions, {
           ...transaction,
           type: 'khata',
           timestamp: new Date().toISOString(),
-          status: 'pending'
+          status: 'unpaid',
+          isPaid: false
         }]
-      }
+      };
 
-      await dbOperations.put(STORES.CUSTOMERS, updatedCustomer)
+      await dbOperations.put(STORES.CUSTOMERS, updatedCustomer);
       set(state => ({
         customers: state.customers.map(c =>
           c.id === customerId ? updatedCustomer : c
         )
-      }))
-      return true
+      }));
+      return true;
     } catch (error) {
-      set({ error: error.message })
-      return false
+      console.error('Failed to add khata transaction:', error);
+      return false;
     }
   },
 
@@ -111,7 +109,12 @@ const useCustomerStore = create((set, get) => ({
           new Date(b.timestamp) - new Date(a.timestamp)
         ),
         analytics: {
-          totalSpent: transactions.reduce((sum, t) => sum + t.total, 0),
+          totalPaid: transactions
+            .filter(t => t.status === 'completed' || t.paymentMethod !== 'khata')
+            .reduce((sum, t) => sum + t.total, 0),
+          totalUnpaid: transactions
+            .filter(t => t.status !== 'completed' && t.paymentMethod === 'khata')
+            .reduce((sum, t) => sum + t.total, 0),
           averageTransaction: transactions.length ? 
             transactions.reduce((sum, t) => sum + t.total, 0) / transactions.length : 0,
           totalVisits: transactions.length,
@@ -212,6 +215,84 @@ const useCustomerStore = create((set, get) => ({
     } catch (error) {
       console.error('Failed to remove customer from group:', error)
       return false
+    }
+  },
+
+  deleteCustomer: async (id) => {
+    set({ loading: true });
+    try {
+      await dbOperations.delete(STORES.CUSTOMERS, id);
+      set(state => ({
+        customers: state.customers.filter(c => c.id !== id),
+        loading: false,
+        error: null
+      }));
+      return true;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      return false;
+    }
+  },
+
+  makePayment: async (customerId, amount) => {
+    try {
+      const customer = await dbOperations.get(STORES.CUSTOMERS, customerId);
+      if (!customer) return false;
+
+      const updatedCustomer = {
+        ...customer,
+        currentCredit: Math.max(0, customer.currentCredit - amount),
+        transactions: [...customer.transactions, {
+          type: 'payment',
+          amount,
+          timestamp: new Date().toISOString(),
+          status: 'completed'
+        }]
+      };
+
+      await dbOperations.put(STORES.CUSTOMERS, updatedCustomer);
+      set(state => ({
+        customers: state.customers.map(c =>
+          c.id === customerId ? updatedCustomer : c
+        )
+      }));
+      return true;
+    } catch (error) {
+      console.error('Payment failed:', error);
+      return false;
+    }
+  },
+
+  updateTransactionPaymentStatus: async (customerId, transactionId, isPaid) => {
+    try {
+      const customer = await dbOperations.get(STORES.CUSTOMERS, customerId);
+      if (!customer) return false;
+
+      const transaction = customer.transactions.find(t => t.id === transactionId);
+      if (!transaction) return false;
+
+      const updatedCustomer = {
+        ...customer,
+        currentCredit: isPaid ? 
+          customer.currentCredit - transaction.total : 
+          customer.currentCredit + transaction.total,
+        transactions: customer.transactions.map(t => 
+          t.id === transactionId ? 
+            { ...t, status: isPaid ? 'paid' : 'unpaid', isPaid } : 
+            t
+        )
+      };
+
+      await dbOperations.put(STORES.CUSTOMERS, updatedCustomer);
+      set(state => ({
+        customers: state.customers.map(c =>
+          c.id === customerId ? updatedCustomer : c
+        )
+      }));
+      return true;
+    } catch (error) {
+      console.error('Failed to update payment status:', error);
+      return false;
     }
   }
 }))
