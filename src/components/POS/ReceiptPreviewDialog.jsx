@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Dialog,
   DialogTitle,
@@ -9,32 +9,54 @@ import {
   Typography,
   Divider,
   Stack,
-  Paper
-} from '@mui/material';
-import { Print, Save, Close } from '@mui/icons-material';
-import { formatCurrency, formatDate, formatTime } from '../../utils/formatters';
-import { generateReceipt } from '../../utils/pdfGenerator';
+  Paper,
+  IconButton,
+  Grid,
+} from "@mui/material";
+import { Print, Save, Close, Receipt } from "@mui/icons-material";
+import { formatCurrency, formatDate, formatTime } from "../../utils/formatters";
+import { generateReceipt } from "../../utils/pdfGenerator";
 
 const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
   if (!transaction) return null;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Receipt Preview</Typography>
-          <Typography variant="subtitle2" color="text.secondary">
-            #{transaction.id}
-          </Typography>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          bgcolor: "grey.50",
+        },
+      }}
+    >
+      <DialogTitle sx={{ bgcolor: "primary.main", color: "white", py: 2 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+        >
+          <Box display="flex" alignItems="center" gap={1}>
+            <Receipt />
+            <Typography variant="h6">Payment Receipt</Typography>
+          </Box>
+          <IconButton onClick={onClose} size="small" sx={{ color: "white" }}>
+            <Close />
+          </IconButton>
         </Stack>
       </DialogTitle>
-      
-      <DialogContent>
-        <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.50' }}>
-          <Stack spacing={2}>
+
+      <DialogContent sx={{ p: 4 }}>
+        <Paper elevation={0} sx={{ p: 3, bgcolor: "white", borderRadius: 2 }}>
+          <Stack spacing={3}>
             {/* Header */}
             <Box textAlign="center">
-              <Typography variant="h6">{transaction.businessName}</Typography>
+              <Typography variant="h5" color="primary.main" gutterBottom>
+                {transaction.businessName}
+              </Typography>
               <Typography variant="body2" color="text.secondary">
                 {transaction.businessAddress}
               </Typography>
@@ -46,88 +68,122 @@ const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
             <Divider />
 
             {/* Transaction Info */}
-            <Box>
-              <Typography variant="body2">
-                Date: {formatDate(transaction.timestamp)}
-              </Typography>
-              <Typography variant="body2">
-                Time: {formatTime(transaction.timestamp)}
-              </Typography>
-              <Typography variant="body2">
-                Customer: {transaction.customerName}
-              </Typography>
-            </Box>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Date: {formatDate(transaction.timestamp)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Time: {formatTime(transaction.timestamp)}
+                </Typography>
+              </Grid>
+              <Grid item xs={6} textAlign="right">
+                <Typography variant="body2" color="text.secondary">
+                  Receipt #: {transaction.id}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Customer: {transaction.customerName || "Walk-in"}
+                </Typography>
+              </Grid>
+            </Grid>
 
             <Divider />
 
             {/* Items */}
-            <Stack spacing={1}>
-              {transaction.items.map((item, index) => (
-                <Box key={index}>
-                  <Typography variant="body2">{item.name}</Typography>
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography variant="body2" color="text.secondary">
-                      {item.quantity} x {formatCurrency(item.price)}
-                    </Typography>
-                    <Typography variant="body2">
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Items
+              </Typography>
+              <Stack spacing={1.5}>
+                {transaction.items.map((item, index) => (
+                  <Stack
+                    key={index}
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Box flex={1}>
+                      <Typography variant="body2">{item.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {item.quantity} x {formatCurrency(item.price)}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" fontWeight={500}>
                       {formatCurrency(item.quantity * item.price)}
                     </Typography>
                   </Stack>
-                </Box>
-              ))}
-            </Stack>
+                ))}
+              </Stack>
+            </Box>
 
             <Divider />
 
             {/* Totals */}
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between">
-                <Typography>Subtotal</Typography>
+                <Typography color="text.secondary">Subtotal</Typography>
                 <Typography>{formatCurrency(transaction.subtotal)}</Typography>
               </Stack>
               <Stack direction="row" justifyContent="space-between">
-                <Typography>Tax</Typography>
+                <Typography color="text.secondary">Tax</Typography>
                 <Typography>{formatCurrency(transaction.taxAmount)}</Typography>
               </Stack>
+              <Divider />
               <Stack direction="row" justifyContent="space-between">
-                <Typography variant="h6">Total</Typography>
-                <Typography variant="h6">{formatCurrency(transaction.total)}</Typography>
+                <Typography variant="subtitle1">Total</Typography>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  {formatCurrency(transaction.total)}
+                </Typography>
               </Stack>
             </Stack>
 
             {/* Payment Details */}
-            <Box>
-              <Typography variant="body2">
-                Payment Method: {transaction.paymentMethod.toUpperCase()}
-              </Typography>
-              {transaction.paymentMethod === 'cash' && (
-                <>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2, borderRadius: 1, borderColor: "primary.main" }}
+            >
+              <Stack spacing={1}>
+                <Typography variant="subtitle2" color="primary">
+                  Payment Details
+                </Typography>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="body2">Method</Typography>
                   <Typography variant="body2">
-                    Amount Paid: {formatCurrency(transaction.amountPaid)}
+                    {transaction.paymentMethod.toUpperCase()}
                   </Typography>
-                  {transaction.change > 0 && (
-                    <Typography variant="body2">
-                      Change: {formatCurrency(transaction.change)}
-                    </Typography>
-                  )}
-                </>
-              )}
-            </Box>
+                </Stack>
+                {transaction.paymentMethod === "cash" && (
+                  <>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">Amount Paid</Typography>
+                      <Typography variant="body2">
+                        {formatCurrency(transaction.amountPaid)}
+                      </Typography>
+                    </Stack>
+                    {transaction.change > 0 && (
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography variant="body2">Change</Typography>
+                        <Typography variant="body2" color="success.main">
+                          {formatCurrency(transaction.change)}
+                        </Typography>
+                      </Stack>
+                    )}
+                  </>
+                )}
+              </Stack>
+            </Paper>
           </Stack>
         </Paper>
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose} startIcon={<Close />}>
-          Close
-        </Button>
+      <DialogActions sx={{ p: 2, bgcolor: "grey.50" }}>
         <Button
           onClick={onPrint}
           variant="contained"
           startIcon={<Print />}
-          color="primary"
+          sx={{ borderRadius: 2 }}
         >
-          Print
+          Print Receipt
         </Button>
         <Button
           onClick={() => {
@@ -136,12 +192,13 @@ const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
           }}
           variant="outlined"
           startIcon={<Save />}
+          sx={{ borderRadius: 2 }}
         >
-          Save PDF
+          Save as PDF
         </Button>
       </DialogActions>
     </Dialog>
   );
 };
 
-export default ReceiptPreviewDialog; 
+export default ReceiptPreviewDialog;

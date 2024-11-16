@@ -42,6 +42,14 @@ const KhataPaymentDialog = ({ open, onClose, customer }) => {
         return
       }
 
+      const paymentTransaction = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        type: 'payment',
+        amount: paymentAmount,
+        status: 'completed'
+      }
+
       const success = makePayment(customer.id, paymentAmount)
       if (success) {
         addTransaction({

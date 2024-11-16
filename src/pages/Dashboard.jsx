@@ -188,15 +188,41 @@ const Dashboard = () => {
     calculateTrends();
   }, [products]);
 
+  // Load initial data and subscribe to updates
   React.useEffect(() => {
+    const init = async () => {
+      await useTransactionStore.getState().loadTransactions();
+      const initialTransactions = useTransactionStore.getState().transactions;
+
+      // Get today's transactions for stats
+      const today = dayjs().startOf("day");
+      const todayTransactions = initialTransactions.filter((t) =>
+        dayjs(t.timestamp).isAfter(today)
+      );
+
+      // Reset and calculate fresh daily stats
+      useDashboardStore.getState().resetDailyStats();
+      todayTransactions.forEach((transaction) => {
+        useDashboardStore.getState().updateSalesData(transaction);
+      });
+
+      // Set recent transactions
+      setRecentTransactions(initialTransactions.slice(0, 5));
+    };
+    init();
+
     const unsubscribe = useTransactionStore.subscribe((state, prevState) => {
-      if (state.transactions.length !== prevState.transactions.length) {
-        const newTransaction = state.transactions[0];
-        if (newTransaction) {
-          updateSalesData(newTransaction);
-          setRecentTransactions((prev) =>
-            [newTransaction, ...prev].slice(0, 5)
-          );
+      // Only update if transactions actually changed
+      if (state.transactions !== prevState?.transactions) {
+        setRecentTransactions(state.transactions.slice(0, 5));
+
+        // Update today's stats if needed
+        const latestTransaction = state.transactions[0];
+        if (
+          latestTransaction &&
+          dayjs(latestTransaction.timestamp).isAfter(dayjs().startOf("day"))
+        ) {
+          useDashboardStore.getState().updateSalesData(latestTransaction);
         }
       }
     });
@@ -204,6 +230,7 @@ const Dashboard = () => {
     return () => unsubscribe();
   }, []);
 
+  // Reset stats at midnight
   React.useEffect(() => {
     const now = new Date();
     const tomorrow = new Date(now);

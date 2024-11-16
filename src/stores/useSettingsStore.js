@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { dbOperations, STORES } from '../utils/db'
 
 const defaultSettings = {
   businessInfo: {
@@ -50,104 +50,77 @@ const defaultSettings = {
   }
 }
 
-export const useSettingsStore = create(
-  persist(
-    (set, get) => ({
-      ...defaultSettings,
+const useSettingsStore = create((set, get) => ({
+  ...defaultSettings,
 
-      updateSettings: (section, settings) => {
-        set(state => ({
-          [section]: {
-            ...state[section],
-            ...settings
-          }
-        }))
-      },
-
-      addQuickCategory: (category) => {
-        set(state => ({
-          posSettings: {
-            ...state.posSettings,
-            quickCategories: [...state.posSettings.quickCategories, category]
-          }
-        }))
-      },
-
-      removeQuickCategory: (categoryId) => {
-        set(state => ({
-          posSettings: {
-            ...state.posSettings,
-            quickCategories: state.posSettings.quickCategories.filter(cat => cat.id !== categoryId)
-          }
-        }))
-      },
-
-      addEmailRecipient: (email) => {
-        set(state => ({
-          notificationSettings: {
-            ...state.notificationSettings,
-            emailRecipients: [...state.notificationSettings.emailRecipients, email]
-          }
-        }))
-      },
-
-      removeEmailRecipient: (email) => {
-        set(state => ({
-          notificationSettings: {
-            ...state.notificationSettings,
-            emailRecipients: state.notificationSettings.emailRecipients.filter(e => e !== email)
-          }
-        }))
-      },
-
-      exportSettings: () => {
-        const state = get()
-        const settings = {
-          businessInfo: state.businessInfo,
-          receiptSettings: state.receiptSettings,
-          posSettings: state.posSettings,
-          systemSettings: state.systemSettings,
-          notificationSettings: state.notificationSettings
-        }
-        return JSON.stringify(settings, null, 2)
-      },
-
-      importSettings: (settingsJson) => {
-        try {
-          const settings = JSON.parse(settingsJson)
-          set({
-            businessInfo: settings.businessInfo || get().businessInfo,
-            receiptSettings: settings.receiptSettings || get().receiptSettings,
-            posSettings: settings.posSettings || get().posSettings,
-            systemSettings: settings.systemSettings || get().systemSettings,
-            notificationSettings: settings.notificationSettings || get().notificationSettings
-          })
-          return true
-        } catch (error) {
-          console.error('Failed to import settings:', error)
-          return false
-        }
-      },
-
-      resetToDefaults: () => set(defaultSettings),
-
-      setCurrency: (currencySymbol, currencyCode) => {
-        set(state => ({
-          posSettings: {
-            ...state.posSettings,
-            currencySymbol,
-            currencyCode
-          }
-        }))
-      },
-
-      updateSystemSettings: (newSettings) => set({ systemSettings: newSettings }),
-    }),
-    {
-      name: 'settings-storage',
-      version: 1,
+  initializeSettings: async () => {
+    const settings = await dbOperations.get(STORES.SETTINGS, 'appSettings')
+    if (settings) {
+      set(settings)
+    } else {
+      await dbOperations.put(STORES.SETTINGS, { 
+        id: 'appSettings',
+        ...defaultSettings 
+      })
     }
-  )
-)
+  },
+
+  updateSettings: async (section, settings) => {
+    const currentSettings = get()
+    const newSettings = {
+      id: 'appSettings',
+      ...currentSettings,
+      [section]: {
+        ...currentSettings[section],
+        ...settings
+      }
+    }
+    await dbOperations.put(STORES.SETTINGS, newSettings)
+    set(newSettings)
+  },
+
+  addQuickCategory: async (category) => {
+    const currentSettings = get()
+    const newSettings = {
+      ...currentSettings,
+      posSettings: {
+        ...currentSettings.posSettings,
+        quickCategories: [...currentSettings.posSettings.quickCategories, category]
+      }
+    }
+    await dbOperations.put(STORES.SETTINGS, {
+      id: 'appSettings',
+      ...newSettings
+    })
+    set(newSettings)
+  },
+
+  exportSettings: () => {
+    const state = get()
+    return JSON.stringify({
+      businessInfo: state.businessInfo,
+      receiptSettings: state.receiptSettings,
+      posSettings: state.posSettings,
+      systemSettings: state.systemSettings,
+      notificationSettings: state.notificationSettings
+    }, null, 2)
+  },
+
+  importSettings: async (settingsJson) => {
+    try {
+      const settings = JSON.parse(settingsJson)
+      const newSettings = {
+        id: 'appSettings',
+        ...settings
+      }
+      await dbOperations.put(STORES.SETTINGS, newSettings)
+      set(settings)
+      return true
+    } catch (error) {
+      console.error('Failed to import settings:', error)
+      return false
+    }
+  }
+}))
 
 export default useSettingsStore

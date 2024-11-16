@@ -59,9 +59,14 @@ const UserManagement = () => {
     const loadUsers = async () => {
         try {
             const allUsers = await dbOperations.getAllUsers()
+            if (!Array.isArray(allUsers)) {
+                throw new Error('Invalid users data received')
+            }
             setUsers(allUsers)
+            setError('')
         } catch (err) {
-            setError('Failed to load users')
+            console.error('Error loading users:', err)
+            setError('Failed to load users. Please try again later.')
         }
     }
 

@@ -6,10 +6,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Box,
   Typography,
   Alert,
@@ -22,10 +18,10 @@ import {
 import { formatCurrency } from "../../utils/formatters";
 import useCartStore from "../../stores/useCartStore";
 import { generateReceipt } from "../../utils/pdfGenerator";
-import { printReceipt } from "../../utils/printer";
 import useSettingsStore from "../../stores/useSettingsStore";
 import ReceiptPreviewDialog from "./ReceiptPreviewDialog";
 import useTransactionStore from "../../stores/useTransactionStore";
+import { Receipt, Print } from "@mui/icons-material";
 
 const PaymentDialog = ({ open, onClose, total, customer }) => {
   const [paymentMethod, setPaymentMethod] = React.useState("cash");
@@ -35,7 +31,7 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
   const [currentTransaction, setCurrentTransaction] = React.useState(null);
   const { completeTransaction, items } = useCartStore();
   const { receiptSettings } = useSettingsStore();
-  const { businessInfo } = useSettingsStore();
+  const [paymentComplete, setPaymentComplete] = React.useState(false);
 
   React.useEffect(() => {
     if (open) {
@@ -64,55 +60,20 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
           paymentMethod === "cash"
             ? Math.max(0, parseFloat(amountPaid) - total)
             : 0,
-        total: total,
+        total,
         status: paymentMethod === "khata" ? "pending" : "completed",
       };
 
       const success = await completeTransaction(paymentDetails);
-      
+
       if (success) {
-        const transaction = {
-          id: Date.now().toString(),
-          timestamp: new Date().toISOString(),
-          items: items.map(item => ({
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.quantity * item.price
-          })),
-          total,
-          paymentMethod,
-          amountPaid: paymentDetails.amountPaid,
-          change: paymentDetails.change,
-          customerId: customer?.id,
-          customerName: customer?.name,
-          status: paymentDetails.status
-        };
-
-        await useTransactionStore.getState().addTransaction(transaction);
-        setCurrentTransaction(transaction);
-        setShowReceipt(true);
-
-        if (receiptSettings.printAutomatically) {
-          handlePrintReceipt(transaction);
-        }
+        const latestTransaction =
+          useTransactionStore.getState().transactions[0];
+        setCurrentTransaction(latestTransaction);
+        setPaymentComplete(true);
       }
     } catch (error) {
       setError(error.message);
-    }
-  };
-
-  const handlePrintReceipt = async (transaction) => {
-    try {
-      const receiptDoc = generateReceipt(transaction);
-      await printReceipt({
-        printerName: receiptSettings.thermalPrinterName,
-        copies: receiptSettings.copies,
-        data: receiptDoc.output('arraybuffer')
-      });
-    } catch (error) {
-      console.error('Failed to print receipt:', error);
     }
   };
 
@@ -121,19 +82,116 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
     onClose();
   };
 
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <Paper elevation={0} sx={{ p: 3 }}>
-        <DialogTitle sx={{ p: 0, mb: 2 }}>
+  const PaymentMethodButton = ({ method, label }) => (
+    <Grid item xs={4}>
+      <Paper
+        elevation={paymentMethod === method ? 4 : 1}
+        sx={{
+          p: 2.5,
+          cursor: "pointer",
+          borderRadius: 2,
+          bgcolor:
+            paymentMethod === method ? "primary.main" : "background.paper",
+          color: paymentMethod === method ? "white" : "text.primary",
+          transition: "all 0.2s ease-in-out",
+          "&:hover": {
+            transform: "translateY(-2px)",
+            bgcolor:
+              paymentMethod === method ? "primary.dark" : "primary.light",
+            color: paymentMethod === method ? "white" : "text.primary",
+          },
+        }}
+        onClick={() => setPaymentMethod(method)}
+      >
+        <Typography align="center" fontWeight={600}>
+          {label}
+        </Typography>
+      </Paper>
+    </Grid>
+  );
+
+  if (paymentComplete && currentTransaction) {
+    return (
+      <Dialog
+        open={open}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2, bgcolor: "grey.50" },
+        }}
+      >
+        <DialogTitle sx={{ bgcolor: "primary.main", color: "white", py: 2 }}>
           <Stack
             direction="row"
             justifyContent="space-between"
             alignItems="center"
           >
-            <Typography variant="h5" fontWeight="bold">
-              Payment
+            <Box display="flex" alignItems="center" gap={1}>
+              <Receipt />
+              <Typography variant="h6">Payment Complete</Typography>
+            </Box>
+          </Stack>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 4 }}>
+          <Stack spacing={3} alignItems="center">
+            <Box textAlign="center">
+              <Typography variant="h5" color="success.main" gutterBottom>
+                ✓ Payment Successful
+              </Typography>
+              <Typography color="text.secondary">
+                Amount Paid: {formatCurrency(currentTransaction.total)}
+              </Typography>
+            </Box>
+
+            {currentTransaction.change > 0 && (
+              <Alert severity="info" sx={{ width: "100%" }}>
+                Change Due: {formatCurrency(currentTransaction.change)}
+              </Alert>
+            )}
+
+            <Button
+              variant="contained"
+              startIcon={<Print />}
+              onClick={() => handlePrintReceipt(currentTransaction)}
+              sx={{ width: "100%", py: 1.5 }}
+            >
+              Print Receipt
+            </Button>
+
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setPaymentComplete(false);
+                onClose();
+              }}
+              sx={{ width: "100%", py: 1.5 }}
+            >
+              Done
+            </Button>
+          </Stack>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <Box sx={{ p: 4 }}>
+        <DialogTitle sx={{ p: 0, mb: 3 }}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Typography variant="h5" fontWeight={700}>
+              Payment Details
             </Typography>
-            <Typography variant="subtitle1" color="text.secondary">
+            <Typography
+              variant="subtitle1"
+              color="text.secondary"
+              fontWeight={500}
+            >
               {customer?.name || "Walk-in Customer"}
             </Typography>
           </Stack>
@@ -147,69 +205,21 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
           )}
 
           <Box sx={{ mb: 4 }}>
-            <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
-              Payment Method
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+              Select Payment Method
             </Typography>
             <Grid container spacing={2}>
-              <Grid item xs={4}>
-                <Paper
-                  elevation={paymentMethod === "cash" ? 3 : 1}
-                  sx={{
-                    p: 2,
-                    cursor: "pointer",
-                    bgcolor:
-                      paymentMethod === "cash"
-                        ? "primary.light"
-                        : "background.paper",
-                    "&:hover": { bgcolor: "primary.light" },
-                  }}
-                  onClick={() => setPaymentMethod("cash")}
-                >
-                  <Typography align="center">Cash</Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={4}>
-                <Paper
-                  elevation={paymentMethod === "card" ? 3 : 1}
-                  sx={{
-                    p: 2,
-                    cursor: "pointer",
-                    bgcolor:
-                      paymentMethod === "card"
-                        ? "primary.light"
-                        : "background.paper",
-                    "&:hover": { bgcolor: "primary.light" },
-                  }}
-                  onClick={() => setPaymentMethod("card")}
-                >
-                  <Typography align="center">Card</Typography>
-                </Paper>
-              </Grid>
+              <PaymentMethodButton method="cash" label="Cash" />
+              <PaymentMethodButton method="card" label="Card" />
               {customer?.id !== "walk-in" && (
-                <Grid item xs={4}>
-                  <Paper
-                    elevation={paymentMethod === "khata" ? 3 : 1}
-                    sx={{
-                      p: 2,
-                      cursor: "pointer",
-                      bgcolor:
-                        paymentMethod === "khata"
-                          ? "primary.light"
-                          : "background.paper",
-                      "&:hover": { bgcolor: "primary.light" },
-                    }}
-                    onClick={() => setPaymentMethod("khata")}
-                  >
-                    <Typography align="center">Khata</Typography>
-                  </Paper>
-                </Grid>
+                <PaymentMethodButton method="khata" label="Khata" />
               )}
             </Grid>
           </Box>
 
           {paymentMethod === "cash" && (
             <Box sx={{ mb: 4 }}>
-              <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                 Amount Received
               </Typography>
               <TextField
@@ -222,26 +232,48 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
                     <InputAdornment position="start">Rs.</InputAdornment>
                   ),
                 }}
-                variant="outlined"
-                size="large"
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: 2,
+                    fontSize: "1.1rem",
+                  },
+                }}
               />
             </Box>
           )}
 
           {paymentMethod === "khata" && (
-            <Alert severity="info" variant="outlined" sx={{ mb: 4 }}>
+            <Alert
+              severity="info"
+              variant="outlined"
+              sx={{
+                mb: 4,
+                borderRadius: 2,
+                "& .MuiAlert-message": {
+                  fontWeight: 500,
+                },
+              }}
+            >
               Amount will be added to customer's credit
             </Alert>
           )}
 
-          <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 3,
+              mb: 3,
+              borderRadius: 2,
+              borderWidth: 2,
+            }}
+          >
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
               Payment Summary
             </Typography>
             <Stack spacing={2}>
               <Stack direction="row" justifyContent="space-between">
                 <Typography>Total Amount</Typography>
-                <Typography fontWeight="bold">
+                <Typography fontWeight={700}>
                   {formatCurrency(total)}
                 </Typography>
               </Stack>
@@ -250,7 +282,7 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
                   <Divider />
                   <Stack direction="row" justifyContent="space-between">
                     <Typography>Change</Typography>
-                    <Typography fontWeight="bold" color="success.main">
+                    <Typography fontWeight={700} color="success.main">
                       {formatCurrency(parseFloat(amountPaid) - total)}
                     </Typography>
                   </Stack>
@@ -265,7 +297,14 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
             onClick={onClose}
             variant="outlined"
             size="large"
-            sx={{ minWidth: 120 }}
+            sx={{
+              minWidth: 120,
+              borderRadius: 2,
+              borderWidth: 2,
+              "&:hover": {
+                borderWidth: 2,
+              },
+            }}
           >
             Cancel
           </Button>
@@ -273,16 +312,25 @@ const PaymentDialog = ({ open, onClose, total, customer }) => {
             onClick={handleSubmit}
             variant="contained"
             size="large"
-            sx={{ minWidth: 120 }}
+            sx={{
+              minWidth: 120,
+              borderRadius: 2,
+              fontWeight: 600,
+              background: "linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)",
+              "&:hover": {
+                background: "linear-gradient(45deg, #1976D2 30%, #00B4D8 90%)",
+              },
+            }}
             disabled={
               paymentMethod === "cash" &&
               (!amountPaid || parseFloat(amountPaid) < total)
             }
           >
-            Complete
+            Complete Payment
           </Button>
         </DialogActions>
-      </Paper>
+      </Box>
+
       <ReceiptPreviewDialog
         open={showReceipt}
         onClose={handleCloseReceipt}

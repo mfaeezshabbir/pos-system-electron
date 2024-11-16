@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { dbOperations, STORES } from '../utils/db'
 import dayjs from 'dayjs'
+import useDashboardStore from './useDashboardStore'
+import useSyncStore from './useSyncStore'
 
 const useTransactionStore = create((set, get) => ({
   transactions: [],
@@ -12,22 +14,37 @@ const useTransactionStore = create((set, get) => ({
     set({ loading: true })
     try {
       const transactions = await dbOperations.getAll(STORES.TRANSACTIONS)
-      set({ transactions, loading: false, error: null })
+      set({ transactions: transactions || [], loading: false, error: null })
+      return transactions
     } catch (error) {
-      set({ error: error.message, loading: false })
+      set({ error: error.message, loading: false, transactions: [] })
+      return []
     }
   },
 
-  // Add transaction
+  // Add transaction with proper updates
   addTransaction: async (transaction) => {
     set({ loading: true })
     try {
       await dbOperations.add(STORES.TRANSACTIONS, transaction)
+      
+      // Update dashboard stats first
+      const dashboardStore = useDashboardStore.getState()
+      dashboardStore.updateSalesData(transaction)
+      
+      // Then update transaction list
       set(state => ({
         transactions: [transaction, ...state.transactions],
         loading: false,
         error: null
       }))
+      
+      // After successful transaction add
+      useSyncStore.getState().broadcastUpdate('TRANSACTION_UPDATE', {
+        action: 'add',
+        transactionId: transaction.id
+      })
+      
       return true
     } catch (error) {
       set({ error: error.message, loading: false })
@@ -127,6 +144,28 @@ const useTransactionStore = create((set, get) => ({
       summary[method].count += 1;
       return summary;
     }, {});
+  },
+
+  // Add this method to the store
+  clearAllTransactions: async () => {
+    set({ loading: true });
+    try {
+      await dbOperations.clear(STORES.TRANSACTIONS);
+      set({ 
+        transactions: [],
+        loading: false,
+        error: null 
+      });
+      // Reset dashboard stats
+      useDashboardStore.getState().resetDailyStats();
+      return true;
+    } catch (error) {
+      set({ 
+        error: error.message, 
+        loading: false 
+      });
+      return false;
+    }
   }
 }))
 

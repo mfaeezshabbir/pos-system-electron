@@ -1,34 +1,125 @@
-# electron-quick-start
+# ShopWise - POS System
 
-**Clone and run for a quick way to see Electron in action.**
+A modern Point of Sale system built with Electron, React, and Material-UI.
 
-This is a minimal Electron application based on the [Quick Start Guide](https://electronjs.org/docs/latest/tutorial/quick-start) within the Electron documentation.
+## Core Features
 
-A basic Electron application needs just these files:
+### Authentication & Authorization
 
-- `package.json` - Points to the app's main file and lists its details and dependencies.
-- `main.js` - Starts the app and creates a browser window to render HTML. This is the app's **main process**.
-- `index.html` - A web page to render. This is the app's **renderer process**.
-- `preload.js` - A content script that runs before the renderer process loads.
+- [x] User login system
+- [x] Role-based access control (Admin, Manager, Cashier)
+- [x] Protected routes
+- [x] User profile management
 
-You can learn more about each of these components in depth within the [Tutorial](https://electronjs.org/docs/latest/tutorial/tutorial-prerequisites).
+### POS Interface
 
-## To Use
+- [x] Product scanning/selection
+- [x] Shopping cart functionality
+- [x] Multiple payment methods (Cash, Card, Khata)
+- [x] Receipt generation and printing
+- [x] Customer selection/management
+- [x] Real-time stock updates
 
-To clone and run this repository you'll need [Git](https://git-scm.com) and [Node.js](https://nodejs.org/en/download/) (which comes with [npm](http://npmjs.com)) installed on your computer. From your command line:
+### Inventory Management
 
-```bash
-# Clone this repository
-git clone https://github.com/electron/electron-quick-start
-# Go into the repository
-cd electron-quick-start
-# Install dependencies
-npm install
-# Run the app
-npm start
-```
+- [x] Product CRUD operations
+- [x] Category management
+- [x] Stock tracking
+- [x] Low stock alerts
+- [x] Bulk import/export via CSV
+- [x] Product search and filtering
 
-Note: If you're using Linux Bash for Windows, [see this guide](https://www.howtogeek.com/261575/how-to-run-graphical-linux-desktop-applications-from-windows-10s-bash-shell/) or use `node` from the command prompt.
+### Customer Management
+
+- [x] Customer profiles
+- [x] Transaction history
+- [x] Credit (Khata) system
+- [x] Customer search
+
+### Reporting
+
+- [x] Sales reports
+- [x] Inventory reports
+- [x] Transaction history
+- [x] Date range filtering
+- [x] Export functionality
+
+### Settings & Configuration
+
+- [x] Business information
+- [x] POS settings
+- [x] Theme customization (Light/Dark mode)
+- [x] User preferences
+
+## Technical Features
+
+### UI/UX
+
+- [x] Responsive design
+- [x] Material Design components
+- [x] Theme customization
+- [x] Toast notifications
+- [x] Loading states
+- [x] Error handling
+
+### Data Management
+
+- [x] Local storage using electron-store
+- [x] Data backup/restore
+- [x] Data export functionality
+
+### Development
+
+- [x] Hot reload in development
+- [x] Production build configuration
+- [x] Cross-platform support
+
+## Planned Features
+
+### Enhanced Security
+
+- [ ] Two-factor authentication
+- [ ] Session management
+- [ ] Activity logging
+
+### Advanced Features
+
+- [ ] Barcode scanning
+- [ ] Multiple currencies
+- [ ] Tax calculation rules
+- [ ] Discount management
+- [ ] Gift card support
+
+### Reporting & Analytics
+
+- [ ] Advanced analytics dashboard
+- [ ] Custom report generation
+- [ ] Data visualization
+- [ ] Email reports
+
+### Integration
+
+- [ ] Cloud backup
+- [ ] External payment gateway integration
+- [ ] Accounting software integration
+- [ ] SMS/Email notifications
+
+## Setup Instructions
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Development mode: `npm run dev`
+4. Build: `npm run build`
+5. Start: `npm start`
+
+## Technology Stack
+
+- Electron
+- React
+- Material-UI
+- Vite
+- Zustand (State Management)
+- electron-store (Data Persistence)
 
 ## Resources for Learning Electron
 

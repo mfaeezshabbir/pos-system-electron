@@ -24,19 +24,103 @@ import Layout from "./components/Layout";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 import Toast from "./components/common/Toast";
 import React from "react";
+import useCustomerStore from "./stores/useCustomerStore";
+import useDashboardStore from "./stores/useDashboardStore";
+import useInventoryStore from "./stores/useInventoryStore";
+import { initDB } from "./utils/db";
+import { CircularProgress, Box } from "@mui/material";
+import useTransactionStore from "./stores/useTransactionStore";
+import { dbOperations } from "./utils/db";
+import useSyncStore from "./stores/useSyncStore";
 
 function App() {
+  const [dbInitialized, setDbInitialized] = React.useState(false);
   const { systemSettings } = useSettingsStore();
 
   const theme = React.useMemo(
     () =>
       createTheme({
         palette: {
-          mode: systemSettings.theme,
+          mode: systemSettings?.theme || "light",
         },
       }),
-    [systemSettings.theme]
+    [systemSettings?.theme]
   );
+
+  React.useEffect(() => {
+    let mounted = true;
+
+    const initializeApp = async () => {
+      try {
+        // Initialize database and wait for completion
+        const db = await initDB();
+
+        if (!mounted) return;
+
+        // Initialize stores sequentially
+        await useSettingsStore.getState().initializeSettings();
+        if (!mounted) return;
+
+        await useCustomerStore.getState().initializeCustomers();
+        if (!mounted) return;
+
+        await useDashboardStore.getState().initializeDashboard();
+        if (!mounted) return;
+
+        await useInventoryStore.getState().initializeInventory();
+        if (!mounted) return;
+
+        await useDashboardStore.getState().scheduleDailyReset();
+        if (!mounted) return;
+
+        await dbOperations.getAllUsers();
+
+        setDbInitialized(true);
+      } catch (error) {
+        console.error("Failed to initialize app:", error);
+      }
+    };
+
+    initializeApp();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    useSyncStore.getState().initSync();
+    
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js', {
+          scope: '/',
+          type: 'classic'
+        }).then(registration => {
+          console.log('ServiceWorker registration successful');
+        }).catch(error => {
+          console.error('ServiceWorker registration failed:', error);
+        });
+      });
+    }
+  }, []);
+
+  if (!dbInitialized) {
+    return (
+      <ThemeProvider theme={theme}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100vh",
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={theme}>

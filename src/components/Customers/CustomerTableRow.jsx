@@ -5,49 +5,74 @@ import {
     Typography,
     IconButton,
     Tooltip,
-    Box
+    Box,
+    Stack,
+    Chip
 } from '@mui/material'
-import { Edit, History } from '@mui/icons-material'
+import { Edit, History, Delete } from '@mui/icons-material'
+import { formatCurrency } from '../../utils/formatters'
 
-const CustomerTableRow = ({ customer, onEdit, onViewHistory }) => {
+const CustomerTableRow = ({ customer, onEdit, onDelete, onViewHistory }) => {
+    // Get status color based on credit
+    const getStatusColor = () => {
+        if (customer.currentCredit === 0) return 'success'
+        if (customer.currentCredit > 0 && customer.currentCredit < customer.creditLimit * 0.8) return 'info'
+        if (customer.currentCredit >= customer.creditLimit * 0.8) return 'warning'
+        return 'error'
+    }
+
+    // Get status label
+    const getStatusLabel = () => {
+        if (customer.currentCredit === 0) return 'Paid'
+        if (customer.currentCredit > 0 && customer.currentCredit < customer.creditLimit * 0.8) return 'Active'
+        if (customer.currentCredit >= customer.creditLimit * 0.8) return 'Near Limit'
+        return 'Over Limit'
+    }
+
     return (
         <TableRow>
             <TableCell>
-                <Typography variant="subtitle1">
-                    {customer.name}
-                </Typography>
-                {customer.cnic && (
-                    <Typography variant="caption" color="text.secondary">
-                        CNIC: {customer.cnic}
+                <Stack spacing={1}>
+                    <Typography variant="subtitle1">
+                        {customer.name}
                     </Typography>
-                )}
-                {customer.address && (
-                    <Typography variant="caption" color="text.secondary" display="block">
-                        {customer.address}
-                    </Typography>
-                )}
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                            size="small"
+                            label={getStatusLabel()}
+                            color={getStatusColor()}
+                            sx={{ borderRadius: 1 }}
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                            Credit: {formatCurrency(customer.currentCredit)}
+                        </Typography>
+                    </Stack>
+                </Stack>
             </TableCell>
             <TableCell>
-                <Box>
-                    <Typography>{customer.phone}</Typography>
+                <Stack spacing={0.5}>
+                    <Typography variant="body2">
+                        {customer.phone}
+                    </Typography>
                     {customer.email && (
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary">
                             {customer.email}
                         </Typography>
                     )}
-                </Box>
+                </Stack>
             </TableCell>
             <TableCell>
-                <Tooltip title="Edit Customer">
-                    <IconButton onClick={() => onEdit(customer)}>
-                        <Edit />
-                    </IconButton>
-                </Tooltip>
-                <Tooltip title="View History">
-                    <IconButton onClick={() => onViewHistory(customer)}>
+                <Stack direction="row" spacing={1}>
+                    <IconButton onClick={() => onViewHistory(customer)} color="primary">
                         <History />
                     </IconButton>
-                </Tooltip>
+                    <IconButton onClick={() => onEdit(customer)} color="info">
+                        <Edit />
+                    </IconButton>
+                    <IconButton onClick={() => onDelete(customer)} color="error">
+                        <Delete />
+                    </IconButton>
+                </Stack>
             </TableCell>
         </TableRow>
     )

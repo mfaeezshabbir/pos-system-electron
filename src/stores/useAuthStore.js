@@ -8,7 +8,7 @@ export const ROLES = {
 }
 
 // Mock users for testing - replace with API in production
-const MOCK_USERS = [
+export const MOCK_USERS = [
     {
         id: '1',
         username: 'a',
