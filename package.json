@@ -1,13 +1,20 @@
 {
-  "name": "electron-quick-start",
+  "name": "shopwise",
   "version": "1.0.0",
-  "description": "A minimal Electron application",
+  "description": "Shopwise --- Point of Sale System. A simple and easy to use POS system for your business.",
+  "author": {
+    "name": "Digisol 365",
+    "email": "info@digisol365.com"
+  },
   "main": "main.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=development concurrently \"vite\" \"electron .\"",
     "start": "npm run build && electron .",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:build": "vite build && electron-builder",
+    "dist": "electron-builder",
+    "build:win": "npm run build && electron-builder --win --x64"
   },
   "dependencies": {
     "@date-io/dayjs": "^3.0.0",
@@ -39,5 +46,25 @@
     "cross-env": "^7.0.3",
     "electron": "^33.2.0",
     "vite": "^5.1.5"
+  },
+  "build": {
+    "appId": "com.digisol.shopwise",
+    "productName": "Shopwise",
+    "directories": {
+      "output": "build-output"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.js"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/images/favicon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
