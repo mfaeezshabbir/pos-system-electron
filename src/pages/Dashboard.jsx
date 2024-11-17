@@ -16,6 +16,7 @@ import {
   ListItemAvatar,
   Tooltip,
   Chip,
+  LinearProgress,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -25,6 +26,7 @@ import {
   MoreVert,
   ArrowUpward,
   ArrowDownward,
+  Refresh,
 } from "@mui/icons-material";
 import useTransactionStore from "../stores/useTransactionStore";
 import useInventoryStore from "../stores/useInventoryStore";
@@ -36,84 +38,85 @@ import dayjs from "dayjs";
 const StatCard = ({
   title,
   value,
-  subtitle,
   icon,
   trend,
   color = "primary",
+  loading = false,
 }) => (
   <Card
-    elevation={2}
+    elevation={0}
     sx={{
       bgcolor: "background.paper",
-      borderRadius: 2,
-      transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
-      "&:hover": {
-        transform: "translateY(-4px)",
-        boxShadow: 4,
-      },
+      borderRadius: 3,
+      border: "1px solid",
+      borderColor: "divider",
     }}
   >
     <CardContent>
-      <Stack spacing={2}>
-        <Stack direction="row" alignItems="center" spacing={2}>
-          <Avatar
-            sx={{
-              bgcolor: `${color}.light`,
-              color: `${color}.main`,
-              p: 2,
-              boxShadow: 1,
-            }}
-          >
-            {icon}
-          </Avatar>
-          <Box flex={1}>
-            <Typography variant="h5" fontWeight="bold" gutterBottom>
-              {value}
-            </Typography>
-            <Typography
-              variant="subtitle1"
-              color="text.secondary"
-              sx={{ fontWeight: 500 }}
-            >
-              {title}
-            </Typography>
-          </Box>
-        </Stack>
-
-        {trend && (
-          <Box>
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
+      {loading ? (
+        <LinearProgress color={color} sx={{ mb: 2 }} />
+      ) : (
+        <Stack spacing={2.5}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Avatar
+              variant="rounded"
               sx={{
-                bgcolor: trend > 0 ? "success.lighter" : "error.lighter",
-                color: trend > 0 ? "success.dark" : "error.dark",
-                py: 0.5,
-                px: 1,
-                borderRadius: 1,
-                width: "fit-content",
+                bgcolor: `${color}.lighter`,
+                color: `${color}.dark`,
+                p: 1.5,
               }}
             >
-              {trend > 0 ? (
-                <ArrowUpward fontSize="small" />
-              ) : (
-                <ArrowDownward fontSize="small" />
-              )}
-              <Typography variant="body2" fontWeight="medium">
-                {Math.abs(trend)}%
+              {icon}
+            </Avatar>
+            <Box flex={1}>
+              <Typography variant="h4" fontWeight={600} sx={{ mb: 0.5 }}>
+                {value}
               </Typography>
-            </Stack>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mt: 0.5 }}
-            >
-              vs last month
-            </Typography>
-          </Box>
-        )}
-      </Stack>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ fontWeight: 500 }}
+              >
+                {title}
+              </Typography>
+            </Box>
+          </Stack>
+
+          {trend !== undefined && (
+            <Box>
+              <Stack
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                sx={{
+                  bgcolor: trend >= 0 ? "success.lighter" : "error.lighter",
+                  color: trend >= 0 ? "success.dark" : "error.dark",
+                  py: 0.5,
+                  px: 1,
+                  borderRadius: 1,
+                  width: "fit-content",
+                }}
+              >
+                {trend >= 0 ? (
+                  <ArrowUpward sx={{ fontSize: 16 }} />
+                ) : (
+                  <ArrowDownward sx={{ fontSize: 16 }} />
+                )}
+                <Typography variant="caption" fontWeight={600}>
+                  {Math.abs(trend)}%
+                </Typography>
+              </Stack>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.5, display: "block" }}
+              >
+                vs. last month
+              </Typography>
+            </Box>
+          )}
+        </Stack>
+      )}
     </CardContent>
   </Card>
 );
@@ -141,19 +144,16 @@ const Dashboard = () => {
       const today = dayjs();
       const lastMonth = today.subtract(1, "month");
 
-      // Get current month's data
       const currentMonthData = transactionStore.getSalesSummary(
         today.startOf("month"),
         today.endOf("month")
       );
 
-      // Get last month's data
       const lastMonthData = transactionStore.getSalesSummary(
         lastMonth.startOf("month"),
         lastMonth.endOf("month")
       );
 
-      // Calculate trends
       const salesTrend =
         lastMonthData.totalRevenue === 0
           ? 100
@@ -169,7 +169,6 @@ const Dashboard = () => {
               lastMonthData.transactionCount) *
             100;
 
-      // Calculate product trend
       const previousProducts = await useInventoryStore
         .getState()
         .getProductCountByDate(lastMonth.endOf("month"));
@@ -182,13 +181,12 @@ const Dashboard = () => {
       setTrends({
         sales: Number(salesTrend.toFixed(1)),
         products: Number(productsTrend.toFixed(1)),
-        transactions: Number(transactionsTrend.toFixed(1))
+        transactions: Number(transactionsTrend.toFixed(1)),
       });
     };
 
     calculateTrends();
-    
-    // Recalculate trends when transactions change
+
     const unsubscribe = useTransactionStore.subscribe(
       (state) => state.transactions,
       () => calculateTrends()
@@ -201,19 +199,20 @@ const Dashboard = () => {
   React.useEffect(() => {
     const init = async () => {
       setLoading(true);
+      try {
+        await useDashboardStore.getState().initializeDashboard();
 
-      // Initialize dashboard first
-      await useDashboardStore.getState().initializeDashboard();
+        const transactionStore = useTransactionStore.getState();
+        if (!transactionStore.transactions.length) {
+          await transactionStore.loadTransactions();
+        }
 
-      // Load transactions only if not already loaded
-      const transactionStore = useTransactionStore.getState();
-      if (!transactionStore.transactions.length) {
-        await transactionStore.loadTransactions();
+        setRecentTransactions(transactionStore.transactions.slice(0, 5));
+      } catch (error) {
+        console.error("Failed to initialize dashboard:", error);
+      } finally {
+        setLoading(false);
       }
-
-      // Set recent transactions
-      setRecentTransactions(transactionStore.transactions.slice(0, 5));
-      setLoading(false);
     };
 
     init();
@@ -243,27 +242,22 @@ const Dashboard = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Add this effect after the existing useEffects
+  // Handle transaction data updates
   React.useEffect(() => {
     const loadTransactionData = async () => {
       setLoading(true);
       try {
-        // Load initial transactions
         const transactionStore = useTransactionStore.getState();
         await transactionStore.loadTransactions();
-        
-        // Get recent transactions
-        const transactions = transactionStore.transactions
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-          .slice(0, 5);
-        
-        setRecentTransactions(transactions);
-        
-        // Update sales data
+
+        const transactions = transactionStore.transactions.sort(
+          (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+        );
+
+        setRecentTransactions(transactions.slice(0, 5));
         await updateSalesData();
-        
       } catch (error) {
-        console.error('Error loading transaction data:', error);
+        console.error("Error loading transaction data:", error);
       } finally {
         setLoading(false);
       }
@@ -271,7 +265,6 @@ const Dashboard = () => {
 
     loadTransactionData();
 
-    // Subscribe to transaction store changes
     const unsubscribe = useTransactionStore.subscribe(
       (state) => state.transactions,
       (transactions) => {
@@ -287,160 +280,229 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 2, height: "100%", overflow: "hidden" }}>
       <Stack
         direction="row"
         justifyContent="space-between"
         alignItems="center"
         mb={4}
       >
-        <Typography variant="h4" fontWeight="bold">
+        <Typography variant="h3" fontWeight="700">
           Dashboard
         </Typography>
-        <IconButton>
-          <MoreVert />
-        </IconButton>
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Refresh Data">
+            <IconButton onClick={() => updateSalesData()}>
+              <Refresh />
+            </IconButton>
+          </Tooltip>
+          <IconButton>
+            <MoreVert />
+          </IconButton>
+        </Stack>
       </Stack>
 
-      <Grid container spacing={3}>
-        {!isCashier && (
+      <Box sx={{ height: "calc(100% - 80px)", overflow: "auto" }}>
+        <Grid container spacing={3}>
+          {!isCashier && (
+            <Grid item xs={12} sm={6} md={3}>
+              <StatCard
+                title="Today's Sales"
+                value={formatCurrency(todaySales)}
+                icon={<TrendingUp />}
+                trend={trends.sales}
+                color="primary"
+                loading={loading}
+              />
+            </Grid>
+          )}
+
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
-              title="Today's Sales"
-              value={formatCurrency(todaySales)}
-              icon={<TrendingUp />}
-              trend={trends.sales}
-              color="primary"
+              title="Total Products"
+              value={products.length}
+              icon={<Inventory />}
+              trend={trends.products}
+              color="info"
+              loading={loading}
             />
           </Grid>
-        )}
 
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Products"
-            value={products.length}
-            icon={<Inventory />}
-            trend={trends.products}
-            color="secondary"
-          />
-        </Grid>
+          {!isCashier && (
+            <Grid item xs={12} sm={6} md={3}>
+              <StatCard
+                title="Today's Transactions"
+                value={todayTransactions}
+                icon={<ShoppingCart />}
+                trend={trends.transactions}
+                color="success"
+                loading={loading}
+              />
+            </Grid>
+          )}
 
-        {!isCashier && (
           <Grid item xs={12} sm={6} md={3}>
             <StatCard
-              title="Today's Transactions"
-              value={todayTransactions}
-              icon={<ShoppingCart />}
-              trend={trends.transactions}
-              color="success"
+              title="Low Stock Items"
+              value={lowStockItems.length}
+              icon={<Warning />}
+              color="error"
+              loading={loading}
             />
           </Grid>
-        )}
 
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Low Stock Items"
-            value={lowStockItems.length}
-            icon={<Warning />}
-            color="error"
-          />
-        </Grid>
+          {!isCashier && (
+            <Grid item xs={12} md={8}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3,
+                  borderRadius: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  maxHeight: "calc(100vh - 300px)",
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  mb={3}
+                >
+                  <Typography variant="h5" fontWeight="700">
+                    Recent Transactions
+                  </Typography>
+                  <Chip
+                    label={`${recentTransactions.length} transactions`}
+                    color="primary"
+                    size="small"
+                  />
+                </Stack>
 
-        {!isCashier && (
-          <Grid item xs={12} md={8}>
-            <Paper elevation={0} sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight="bold" mb={3}>
-                Recent Transactions
-              </Typography>
-              <List>
-                {recentTransactions.map((transaction) => (
-                  <React.Fragment key={transaction.id}>
-                    <ListItem
-                      secondaryAction={
-                        <Stack direction="row" spacing={2} alignItems="center">
-                          <Typography variant="subtitle1" fontWeight="bold">
-                            {formatCurrency(transaction.total)}
-                          </Typography>
-                          {transaction.paymentMethod === "khata" && (
-                            <Chip
-                              size="small"
-                              label={
-                                transaction.status === "completed"
-                                  ? "Paid"
-                                  : "Unpaid"
-                              }
-                              color={
-                                transaction.status === "completed"
-                                  ? "success"
-                                  : "warning"
-                              }
-                              sx={{ minWidth: 80 }}
-                            />
-                          )}
-                        </Stack>
-                      }
-                    >
-                      <ListItemAvatar>
-                        <Avatar
+                {loading ? (
+                  <LinearProgress />
+                ) : (
+                  <List sx={{ overflow: "auto", flex: 1 }}>
+                    {recentTransactions.map((transaction) => (
+                      <React.Fragment key={transaction.id}>
+                        <ListItem
                           sx={{
-                            bgcolor:
-                              transaction.paymentMethod === "khata"
-                                ? transaction.status === "completed"
-                                  ? "success.light"
-                                  : "warning.light"
-                                : "primary.light",
+                            transition: "background-color 0.2s",
+                            "&:hover": {
+                              bgcolor: "action.hover",
+                            },
+                            borderRadius: 2,
+                            mb: 1,
                           }}
-                        >
-                          <ShoppingCart />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                          >
-                            <Typography variant="subtitle2">
-                              Order #{(transaction.id?.toString() || '').slice(-4)}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
+                          secondaryAction={
+                            <Stack
+                              direction="row"
+                              spacing={2}
+                              alignItems="center"
                             >
-                              ({transaction.paymentMethod})
-                            </Typography>
-                          </Stack>
-                        }
-                        secondary={
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                          >
-                            <Typography variant="body2" color="text.secondary">
-                              {new Date(transaction.timestamp).toLocaleString()}
-                            </Typography>
-                            {transaction.paymentMethod === "khata" && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                ({transaction.status})
+                              <Typography variant="subtitle1" fontWeight="600">
+                                {formatCurrency(transaction.total)}
                               </Typography>
-                            )}
-                          </Stack>
-                        }
-                      />
-                    </ListItem>
-                    <Divider variant="inset" component="li" />
-                  </React.Fragment>
-                ))}
-              </List>
-            </Paper>
-          </Grid>
-        )}
-      </Grid>
+                              {transaction.paymentMethod === "khata" && (
+                                <Chip
+                                  size="small"
+                                  label={
+                                    transaction.status === "completed"
+                                      ? "Paid"
+                                      : "Unpaid"
+                                  }
+                                  color={
+                                    transaction.status === "completed"
+                                      ? "success"
+                                      : "warning"
+                                  }
+                                  sx={{ minWidth: 80 }}
+                                />
+                              )}
+                            </Stack>
+                          }
+                        >
+                          <ListItemAvatar>
+                            <Avatar
+                              variant="rounded"
+                              sx={{
+                                bgcolor:
+                                  transaction.paymentMethod === "khata"
+                                    ? transaction.status === "completed"
+                                      ? "success.lighter"
+                                      : "warning.lighter"
+                                    : "primary.lighter",
+                                color:
+                                  transaction.paymentMethod === "khata"
+                                    ? transaction.status === "completed"
+                                      ? "success.dark"
+                                      : "warning.dark"
+                                    : "primary.dark",
+                              }}
+                            >
+                              <ShoppingCart />
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                alignItems="center"
+                              >
+                                <Typography
+                                  variant="subtitle2"
+                                  fontWeight="600"
+                                >
+                                  Order #
+                                  {(transaction.id?.toString() || "").slice(-4)}
+                                </Typography>
+                                <Chip
+                                  label={transaction.paymentMethod}
+                                  size="small"
+                                  variant="outlined"
+                                />
+                              </Stack>
+                            }
+                            secondary={
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                alignItems="center"
+                              >
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
+                                  {new Date(
+                                    transaction.timestamp
+                                  ).toLocaleString()}
+                                </Typography>
+                                {transaction.paymentMethod === "khata" && (
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    ({transaction.status})
+                                  </Typography>
+                                )}
+                              </Stack>
+                            }
+                          />
+                        </ListItem>
+                        <Divider component="li" sx={{ my: 1 }} />
+                      </React.Fragment>
+                    ))}
+                  </List>
+                )}
+              </Paper>
+            </Grid>
+          )}
+        </Grid>
+      </Box>
     </Box>
   );
 };

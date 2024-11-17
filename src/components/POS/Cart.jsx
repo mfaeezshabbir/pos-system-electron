@@ -46,9 +46,9 @@ const CartItem = ({ item, onQuantityChange, onRemove, product }) => {
         borderColor: isOutOfStock ? "error.main" : "divider",
         transition: "all 0.2s ease-in-out",
         "&:hover": {
-          transform: "translateY(-2px)",
           boxShadow: 4,
         },
+        cursor: "pointer",
       }}
     >
       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -90,7 +90,7 @@ const CartItem = ({ item, onQuantityChange, onRemove, product }) => {
           </Box>
 
           <Stack direction="row" spacing={0.75} alignItems="center">
-            <Tooltip title="Decrease quantity" arrow>
+            <Tooltip title="Decrease quantity (Ctrl+-)" arrow>
               <span>
                 <IconButton
                   size="small"
@@ -114,6 +114,11 @@ const CartItem = ({ item, onQuantityChange, onRemove, product }) => {
               size="small"
               value={item.quantity}
               onChange={(e) => onQuantityChange(parseInt(e.target.value) || 0)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.target.blur();
+                }
+              }}
               sx={{
                 width: "60px",
                 "& .MuiOutlinedInput-root": {
@@ -137,7 +142,7 @@ const CartItem = ({ item, onQuantityChange, onRemove, product }) => {
               }}
             />
 
-            <Tooltip title="Increase quantity" arrow>
+            <Tooltip title="Increase quantity (Ctrl++)" arrow>
               <span>
                 <IconButton
                   size="small"
@@ -157,7 +162,7 @@ const CartItem = ({ item, onQuantityChange, onRemove, product }) => {
               </span>
             </Tooltip>
 
-            <Tooltip title="Remove item" arrow>
+            <Tooltip title="Remove item (Del)" arrow>
               <IconButton
                 size="small"
                 color="error"
@@ -197,8 +202,33 @@ const Cart = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = React.useState(false);
   const [customerDialogOpen, setCustomerDialogOpen] = React.useState(false);
   const [customerMenuAnchor, setCustomerMenuAnchor] = React.useState(null);
-  
+
   const totals = getCartTotals(posSettings.defaultTaxRate);
+
+  // Handle keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey) {
+        switch (e.key) {
+          case "p":
+            e.preventDefault();
+            if (customer && items.length > 0) {
+              setPaymentDialogOpen(true);
+            }
+            break;
+          case "c":
+            e.preventDefault();
+            setCustomerDialogOpen(true);
+            break;
+          default:
+            break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [customer, items]);
 
   const handleQuantityChange = (item, newQuantity) => {
     if (newQuantity > 0) {
@@ -233,7 +263,11 @@ const Cart = () => {
           color: "white",
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={1.5}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
           <ShoppingCart sx={{ color: "white" }} />
           <Typography variant="h6" sx={{ color: "white", fontWeight: 600 }}>
             Cart
@@ -335,6 +369,9 @@ const Cart = () => {
             >
               Your cart is empty
             </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Press F3 to search products
+            </Typography>
           </Box>
         ) : (
           items.map((item) => {
@@ -359,7 +396,8 @@ const Cart = () => {
         sx={{
           p: 2.5,
           borderRadius: 2,
-          background: "linear-gradient(to bottom, #ffffff, #f5f5f5)",
+          bgcolor: (theme) => theme.palette.background.paper,
+          boxShadow: (theme) => theme.shadows[3],
         }}
       >
         <Stack spacing={2}>
@@ -405,15 +443,14 @@ const Cart = () => {
               fontWeight: 600,
               "&:hover": {
                 borderWidth: "2px",
-                transform: "translateY(-2px)",
-                boxShadow: 2,
+                boxShadow: (theme) => theme.shadows[2],
               },
               transition: "all 0.2s",
             }}
           >
             {customer
-              ? `Change Customer (${customer.name})`
-              : "Select Customer"}
+              ? `Change Customer (${customer.name}) (Ctrl+C)`
+              : "Select Customer (Ctrl+C)"}
           </Button>
 
           {customer && (
@@ -428,16 +465,17 @@ const Cart = () => {
                 borderRadius: 2,
                 textTransform: "none",
                 fontWeight: 600,
-                background: "linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)",
-                boxShadow: 2,
+                bgcolor: (theme) => theme.palette.primary.main,
+                color: (theme) => theme.palette.primary.contrastText,
+                boxShadow: (theme) => theme.shadows[2],
                 "&:hover": {
-                  boxShadow: 4,
-                  transform: "translateY(-2px)",
+                  bgcolor: (theme) => theme.palette.primary.dark,
+                  boxShadow: (theme) => theme.shadows[4],
                 },
                 transition: "all 0.2s",
               }}
             >
-              Proceed to Payment
+              Proceed to Payment (Ctrl+P)
             </Button>
           )}
         </Stack>

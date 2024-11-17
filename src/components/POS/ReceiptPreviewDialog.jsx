@@ -27,6 +27,24 @@ import useSettingsStore from "../../stores/useSettingsStore";
 const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
   if (!transaction) return null;
 
+  const businessDetails = transaction.businessDetails || {};
+  const items = transaction.items || [];
+
+  const {
+    customerName = "Guest",
+    customerPhone = "",
+    customerAddress = "",
+    subtotal = 0,
+    taxAmount = 0,
+    discount = 0,
+    total = 0,
+    paymentMethod = "cash",
+    amountPaid = 0,
+    change = 0,
+    timestamp = new Date(),
+    id = "",
+  } = transaction;
+
   return (
     <Dialog
       open={open}
@@ -62,31 +80,31 @@ const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
             {/* Business Header */}
             <Box textAlign="center">
               <Typography variant="h5" color="primary.main" gutterBottom>
-                {transaction.businessDetails?.name}
+                {businessDetails.name || "Business Name"}
               </Typography>
-              {transaction.businessDetails?.address && (
+              {businessDetails.address && (
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {transaction.businessDetails.address}
+                  {businessDetails.address}
                 </Typography>
               )}
-              {transaction.businessDetails?.phone && (
+              {businessDetails.phone && (
                 <Typography variant="body2" color="text.secondary">
-                  Tel: {transaction.businessDetails.phone}
+                  Tel: {businessDetails.phone}
                 </Typography>
               )}
-              {transaction.businessDetails?.email && (
+              {/* {businessDetails.email && (
                 <Typography variant="body2" color="text.secondary">
-                  Email: {transaction.businessDetails.email}
+                  Email: {businessDetails.email}
                 </Typography>
               )}
-              {transaction.businessDetails?.website && (
+              {businessDetails.website && (
                 <Typography variant="body2" color="text.secondary">
-                  Web: {transaction.businessDetails.website}
+                  Web: {businessDetails.website}
                 </Typography>
-              )}
-              {transaction.businessDetails?.taxId && (
+              )} */}
+              {businessDetails.taxId && (
                 <Typography variant="body2" color="text.secondary">
-                  Tax ID: {transaction.businessDetails.taxId}
+                  Tax ID: {businessDetails.taxId}
                 </Typography>
               )}
             </Box>
@@ -101,14 +119,12 @@ const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
                     <Typography variant="subtitle2" color="primary">
                       Transaction Info
                     </Typography>
+                    <Typography variant="body2">Receipt #: {id}</Typography>
                     <Typography variant="body2">
-                      Receipt #: {transaction.id}
+                      Date: {formatDate(timestamp)}
                     </Typography>
                     <Typography variant="body2">
-                      Date: {formatDate(transaction.timestamp)}
-                    </Typography>
-                    <Typography variant="body2">
-                      Time: {formatTime(transaction.timestamp)}
+                      Time: {formatTime(timestamp)}
                     </Typography>
                   </Stack>
                 </Grid>
@@ -118,19 +134,18 @@ const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
                       Customer Details
                     </Typography>
                     <Typography variant="body2">
-                      Name: {transaction.customerName}
+                      Name: {customerName}
                     </Typography>
-                    {transaction.customerPhone && (
+                    {customerPhone && (
                       <Typography variant="body2">
-                        Phone: {transaction.customerPhone}
+                        Phone: {customerPhone}
                       </Typography>
                     )}
-                    {transaction.paymentMethod === "khata" &&
-                      transaction.customerAddress && (
-                        <Typography variant="body2">
-                          Address: {transaction.customerAddress}
-                        </Typography>
-                      )}
+                    {customerAddress && (
+                      <Typography variant="body2">
+                        Address: {customerAddress}
+                      </Typography>
+                    )}
                   </Stack>
                 </Grid>
               </Grid>
@@ -152,7 +167,7 @@ const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {transaction.items.map((item, index) => (
+                    {items.map((item, index) => (
                       <TableRow key={index}>
                         <TableCell>{item.name}</TableCell>
                         <TableCell align="center">{item.quantity}</TableCell>
@@ -182,27 +197,27 @@ const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
                   <Stack direction="row" justifyContent="space-between">
                     <Typography variant="body2">Subtotal</Typography>
                     <Typography variant="body2">
-                      {formatCurrency(transaction.subtotal)}
+                      {formatCurrency(subtotal)}
                     </Typography>
                   </Stack>
                   <Stack direction="row" justifyContent="space-between">
                     <Typography variant="body2">Tax</Typography>
                     <Typography variant="body2">
-                      {formatCurrency(transaction.taxAmount)}
+                      {formatCurrency(taxAmount)}
                     </Typography>
                   </Stack>
-                  {transaction.discount > 0 && (
+                  {discount > 0 && (
                     <Stack direction="row" justifyContent="space-between">
                       <Typography variant="body2">Discount</Typography>
                       <Typography variant="body2">
-                        {formatCurrency(transaction.discount)}
+                        {formatCurrency(discount)}
                       </Typography>
                     </Stack>
                   )}
                   <Stack direction="row" justifyContent="space-between">
                     <Typography variant="subtitle1">Total</Typography>
                     <Typography variant="subtitle1" fontWeight={600}>
-                      {formatCurrency(transaction.total)}
+                      {formatCurrency(total)}
                     </Typography>
                   </Stack>
                 </Stack>
@@ -221,22 +236,22 @@ const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
                 <Stack direction="row" justifyContent="space-between">
                   <Typography variant="body2">Method</Typography>
                   <Typography variant="body2">
-                    {transaction.paymentMethod.toUpperCase()}
+                    {paymentMethod.toUpperCase()}
                   </Typography>
                 </Stack>
-                {transaction.paymentMethod === "cash" && (
+                {paymentMethod === "cash" && (
                   <>
                     <Stack direction="row" justifyContent="space-between">
                       <Typography variant="body2">Amount Paid</Typography>
                       <Typography variant="body2">
-                        {formatCurrency(transaction.amountPaid)}
+                        {formatCurrency(amountPaid)}
                       </Typography>
                     </Stack>
-                    {transaction.change > 0 && (
+                    {change > 0 && (
                       <Stack direction="row" justifyContent="space-between">
                         <Typography variant="body2">Change</Typography>
                         <Typography variant="body2" color="success.main">
-                          {formatCurrency(transaction.change)}
+                          {formatCurrency(change)}
                         </Typography>
                       </Stack>
                     )}
@@ -249,32 +264,37 @@ const ReceiptPreviewDialog = ({ open, onClose, transaction, onPrint }) => {
       </DialogContent>
 
       <DialogActions sx={{ p: 2, bgcolor: "grey.50" }}>
-        <Button
+        {/* <Button
           onClick={onPrint}
           variant="contained"
           startIcon={<Print />}
           sx={{ borderRadius: 2 }}
         >
           Print Receipt
-        </Button>
+        </Button> */}
         <Button
-          onClick={async () => {
-            const { businessInfo, receiptSettings } =
-              useSettingsStore.getState();
-            const enrichedTransaction = {
-              ...transaction,
-              businessName: businessInfo.name,
-              businessAddress: businessInfo.address,
-              businessPhone: businessInfo.phone,
-              businessEmail: businessInfo.email,
-              businessWebsite: businessInfo.website,
-              businessTaxId: businessInfo.taxId,
-            };
-            const receiptDoc = generateReceipt(
-              enrichedTransaction,
-              receiptSettings
-            );
-            receiptDoc.save(`Receipt-${transaction.id}.pdf`);
+          onClick={() => {
+            try {
+              const { businessInfo = {}, receiptSettings = {} } =
+                useSettingsStore.getState();
+              const enrichedTransaction = {
+                ...transaction,
+                businessName: businessInfo.name || "",
+                businessAddress: businessInfo.address || "",
+                businessPhone: businessInfo.phone || "",
+                businessEmail: businessInfo.email || "",
+                businessWebsite: businessInfo.website || "",
+                businessTaxId: businessInfo.taxId || "",
+              };
+              const receiptDoc = generateReceipt(
+                enrichedTransaction,
+                receiptSettings
+              );
+              receiptDoc.save(`Receipt-${transaction.id || "unknown"}.pdf`);
+            } catch (error) {
+              console.error("Error generating PDF:", error);
+              // You might want to show an error notification here
+            }
           }}
           variant="outlined"
           startIcon={<Save />}

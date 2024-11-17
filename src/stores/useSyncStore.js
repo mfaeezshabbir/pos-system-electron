@@ -32,7 +32,7 @@ const useSyncStore = create((set, get) => ({
           
         case 'TRANSACTION_UPDATE':
           await useTransactionStore.getState().loadTransactions()
-          await useDashboardStore.getState().updateSalesTrends()
+          await useDashboardStore.getState().updateSalesData()
           break
           
         case 'CUSTOMER_UPDATE':

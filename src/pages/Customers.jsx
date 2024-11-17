@@ -21,7 +21,8 @@ import SearchBar from "../components/common/SearchBar";
 import ConfirmDialog from "../components/common/ConfirmDialog";
 
 const Customers = () => {
-  const { customers, loading, initializeCustomers, deleteCustomer } = useCustomerStore();
+  const { customers, loading, initializeCustomers, deleteCustomer } =
+    useCustomerStore();
   const [selectedCustomer, setSelectedCustomer] = React.useState(null);
   const [addDialogOpen, setAddDialogOpen] = React.useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = React.useState(false);

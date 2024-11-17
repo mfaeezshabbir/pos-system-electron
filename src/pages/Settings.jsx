@@ -21,12 +21,12 @@ const Settings = () => {
       component: BusinessSettings,
       roles: [ROLES.ADMIN],
     },
-    {
-      label: "System Settings",
-      permission: PERMISSIONS.MANAGE_SYSTEM_SETTINGS,
-      component: SystemSettings,
-      roles: [ROLES.ADMIN, ROLES.MANAGER],
-    },
+    // {
+    //   label: "System Settings",
+    //   permission: PERMISSIONS.MANAGE_SYSTEM_SETTINGS,
+    //   component: SystemSettings,
+    //   roles: [ROLES.ADMIN, ROLES.MANAGER],
+    // },
     {
       label: "POS Settings",
       permission: PERMISSIONS.MANAGE_POS_SETTINGS,

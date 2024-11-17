@@ -13,6 +13,8 @@ import {
   Tooltip,
   CardActions,
   Button,
+  Stack,
+  Paper,
 } from "@mui/material";
 import {
   Search,
@@ -20,6 +22,7 @@ import {
   Delete,
   Warning,
   ShoppingCart,
+  Clear,
 } from "@mui/icons-material";
 import { formatCurrency } from "../../utils/formatters";
 import useSettingsStore from "../../stores/useSettingsStore";
@@ -46,87 +49,102 @@ const ProductList = ({ products, onEdit, onDelete, userRole }) => {
     userRole === ROLES.ADMIN || userRole === ROLES.MANAGER;
 
   return (
-    <Box>
+    <Stack spacing={3}>
       {/* Search Bar */}
-      <TextField
-        fullWidth
-        variant="outlined"
-        placeholder="Search products..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        sx={{ mb: 3 }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <Search />
-            </InputAdornment>
-          ),
-        }}
-      />
+      <Paper elevation={0} sx={{ p: 2, borderRadius: 2 }}>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Search by name, SKU or category..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm && (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearchTerm("")}>
+                  <Clear />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2,
+              bgcolor: "background.paper",
+            },
+          }}
+        />
+      </Paper>
 
       {/* Product Grid */}
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {filteredProducts.map((product) => {
           const isLowStock = product.stock <= lowStockThreshold;
+          const isOutOfStock = product.stock === 0;
 
           return (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
+            <Grid item xs={12} sm={6} md={3} lg={2} key={product.id}>
               <Card
+                elevation={0}
                 sx={{
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
                   position: "relative",
                   transition: "all 0.2s ease-in-out",
-                  "&:hover": {
-                    transform: "translateY(-4px)",
-                    boxShadow: (theme) => theme.shadows[8],
-                  },
                   borderRadius: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
                   overflow: "hidden",
                 }}
               >
-                {/* Stock Status Badge */}
-                {isLowStock && (
-                  <Chip
-                    label={product.stock === 0 ? "Out of Stock" : "Low Stock"}
-                    color={product.stock === 0 ? "error" : "warning"}
-                    size="small"
+                <Box sx={{ position: "relative" }}>
+                  <CardMedia
+                    component="img"
+                    height="120"
+                    image={product.image || DEFAULT_PRODUCT_IMAGE}
+                    alt={product.name}
                     sx={{
-                      position: "absolute",
-                      top: 8,
-                      right: 8,
-                      zIndex: 1,
-                      fontWeight: 500,
-                      "& .MuiChip-label": {
-                        px: 1,
-                        fontSize: "0.75rem",
-                      },
+                      objectFit: "contain",
+                      bgcolor: (theme) =>
+                        theme.palette.mode === "light" ? "grey.50" : "grey.900",
+                      p: 2,
                     }}
                   />
-                )}
+                  {(isLowStock || isOutOfStock) && (
+                    <Chip
+                      label={isOutOfStock ? "Out" : "Low"}
+                      color={isOutOfStock ? "error" : "warning"}
+                      size="small"
+                      sx={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        fontWeight: 600,
+                        fontSize: "0.7rem",
+                        height: 20,
+                      }}
+                    />
+                  )}
+                </Box>
 
-                <CardMedia
-                  component="img"
-                  height="120"
-                  image={product.image || DEFAULT_PRODUCT_IMAGE}
-                  alt={product.name}
-                  sx={{
-                    objectFit: "contain",
-                    p: 1,
-                    bgcolor: (theme) =>
-                      theme.palette.mode === "light" ? "grey.50" : "grey.900",
-                  }}
-                />
-
-                <CardContent sx={{ flexGrow: 1, p: 1.5 }}>
+                <CardContent sx={{ p: 1.5, flexGrow: 1 }}>
                   <Typography
-                    variant="subtitle1"
-                    noWrap
-                    title={product.name}
+                    variant="subtitle2"
                     sx={{
                       fontWeight: 600,
                       mb: 0.5,
+                      height: "2.4em",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
                       fontSize: "0.875rem",
                     }}
                   >
@@ -134,111 +152,86 @@ const ProductList = ({ products, onEdit, onDelete, userRole }) => {
                   </Typography>
 
                   <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mb: 1, display: "block" }}
+                    variant="body2"
+                    color="primary.main"
+                    sx={{ fontWeight: 600, mb: 0.5 }}
                   >
-                    SKU: {product.sku}
+                    {formatCurrency(product.price)}
                   </Typography>
 
-                  <Box
+                  <Typography
+                    variant="caption"
+                    color={isLowStock ? "warning.main" : "success.main"}
                     sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      mb: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="subtitle1"
-                      color="primary"
-                      sx={{ fontWeight: 600 }}
-                    >
-                      {formatCurrency(product.price)}
-                    </Typography>
-                    <Chip
-                      label={product.category}
-                      size="small"
-                      color="default"
-                      variant="outlined"
-                      sx={{
-                        borderRadius: 1,
-                        "& .MuiChip-label": {
-                          px: 1,
-                          fontSize: "0.75rem",
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box
-                    sx={{
+                      fontWeight: 500,
                       display: "flex",
                       alignItems: "center",
                       gap: 0.5,
                     }}
                   >
-                    <Typography variant="caption" sx={{ fontWeight: 500 }}>
-                      Stock: {product.stock}
-                    </Typography>
-                    {isLowStock && (
-                      <Tooltip title="Low Stock">
-                        <Warning color="warning" sx={{ fontSize: "1rem" }} />
-                      </Tooltip>
-                    )}
-                  </Box>
+                    <Box
+                      sx={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        bgcolor: isLowStock ? "warning.main" : "success.main",
+                      }}
+                    />
+                    {product.stock} in stock
+                  </Typography>
                 </CardContent>
 
                 <CardActions
-                  sx={{
-                    justifyContent: "space-between",
-                    px: 1.5,
-                    pb: 1.5,
-                    pt: 0,
-                  }}
+                  sx={{ p: 1, borderTop: "1px solid", borderColor: "divider" }}
                 >
-                  <Box>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    width="100%"
+                    spacing={1}
+                  >
                     {canEditProducts && (
-                      <>
+                      <Stack direction="row" spacing={0.5}>
                         <IconButton
                           size="small"
                           onClick={() => onEdit(product)}
+                          sx={{ p: 0.5 }}
+                          color="success"
                         >
-                          <Edit />
+                          <Edit sx={{ fontSize: 20 }} />
                         </IconButton>
                         <IconButton
                           size="small"
-                          color="error"
                           onClick={() => onDelete(product)}
+                          sx={{ p: 0.5 }}
+                          color="error"
                         >
-                          <Delete />
+                          <Delete sx={{ fontSize: 20 }} />
                         </IconButton>
-                      </>
+                      </Stack>
                     )}
-                  </Box>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<ShoppingCart sx={{ fontSize: "1rem" }} />}
-                    onClick={() => addToCart(product)}
-                    disabled={product.stock <= 0}
-                    sx={{
-                      borderRadius: 1,
-                      textTransform: "none",
-                      px: 1,
-                      py: 0.5,
-                      fontSize: "0.75rem",
-                    }}
-                  >
-                    Add to Cart
-                  </Button>
+                    <Box sx={{ flexGrow: canEditProducts ? 0 : 1 }} />
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => addToCart(product)}
+                      disabled={isOutOfStock}
+                      sx={{
+                        minWidth: 0,
+                        p: 1,
+                      }}
+                    >
+                      <ShoppingCart sx={{ fontSize: 16 }} />
+                    </Button>
+                  </Stack>
                 </CardActions>
               </Card>
             </Grid>
           );
         })}
       </Grid>
-    </Box>
+    </Stack>
   );
 };
 

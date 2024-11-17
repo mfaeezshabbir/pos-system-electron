@@ -4,13 +4,34 @@ import { formatCurrency, formatDate, formatTime } from './formatters'
 
 export const generateReceipt = (transaction, receiptSettings) => {
   const doc = new jsPDF({
+    orientation: 'portrait',
     unit: 'mm',
     format: [80, 200] // Standard thermal receipt width
   })
 
-  let yPos = 10
+  // Define constants at the top
+  const pageHeight = doc.internal.pageSize.height
   const centerX = 40 // Center position (80/2)
   const rightX = 70 // Right align position
+
+  // Add this function to handle the footer after centerX is defined
+  const addFooter = () => {
+    doc.setFontSize(8)
+    doc.text('Developed by: DigiSol 365 | www.digisol365.com\n0305-1414290', centerX, pageHeight - 10, { align: 'center' })
+  }
+
+  let yPos = 10
+
+  // Add footer to first page
+  addFooter()
+
+  // Add footer to all pages
+  doc.setPage(1)
+  const totalPages = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+    addFooter()
+  }
 
   // Business Name - Larger and Bold
   doc.setFontSize(14)
@@ -37,14 +58,17 @@ export const generateReceipt = (transaction, receiptSettings) => {
     yPos += 5
   }
 
-  if (transaction.businessDetails?.email) {
-    doc.text(`Email: ${transaction.businessDetails.email}`, centerX, yPos, { align: 'center' })
-    yPos += 5
-  }
+  // Only show email and website if not hidden in settings
+  if (!receiptSettings.hideEmailWebsite) {
+    if (transaction.businessDetails?.email) {
+      doc.text(`Email: ${transaction.businessDetails.email}`, centerX, yPos, { align: 'center' })
+      yPos += 5
+    }
 
-  if (transaction.businessDetails?.website) {
-    doc.text(`Web: ${transaction.businessDetails.website}`, centerX, yPos, { align: 'center' })
-    yPos += 5
+    if (transaction.businessDetails?.website) {
+      doc.text(`Web: ${transaction.businessDetails.website}`, centerX, yPos, { align: 'center' })
+      yPos += 5
+    }
   }
 
   if (transaction.businessDetails?.taxId) {
@@ -81,7 +105,7 @@ export const generateReceipt = (transaction, receiptSettings) => {
   if (Array.isArray(transaction.items) && transaction.items.length > 0) {
     transaction.items.forEach(item => {
       if (!item) return; // Skip if item is undefined
-      
+
       // Item name and SKU if available
       doc.text(`${item.name || 'Unknown Item'}${item.sku ? ` (${item.sku})` : ''}`, 10, yPos);
       yPos += 4;
@@ -89,7 +113,7 @@ export const generateReceipt = (transaction, receiptSettings) => {
       const quantity = item.quantity || 0;
       const price = item.price || 0;
       const subtotal = quantity * price;
-      
+
       doc.text(`${quantity} x ${formatCurrency(price)}`, 10, yPos);
       doc.text(formatCurrency(subtotal), rightX, yPos, { align: 'right' });
       yPos += 6;

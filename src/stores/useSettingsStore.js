@@ -3,21 +3,22 @@ import { dbOperations, STORES } from '../utils/db'
 import defaultLogo from '../assets/default-business-logo';
 
 const DEFAULT_BUSINESS_INFO = {
-  name: 'SNS ZARAI MARKAZ',
-  address: 'Fedar Adda, Minchinabad',
-  phone: '03421590004',
-  email: 'snszaraimarkaz@gmail.com',
-  website: 'www.snszaraimarkaz.com',
-  taxId: '',
+  name: "SNS ZARAI MARKAZ",
+  address: "Fedar Adda, Minchinabad",
+  phone: "03421590004",
+  email: "snszaraimarkaz@gmail.com",
+  website: "www.snszaraimarkaz.com",
+  taxId: "",
   logo: defaultLogo
 };
 
 const useSettingsStore = create((set, get) => ({
   businessInfo: DEFAULT_BUSINESS_INFO,
   receiptSettings: {
-    footer: 'Thank you for your business!',
-    returnPolicy: 'Returns accepted within 7 days with receipt',
-    showQR: false
+    footer: "Thank you for your business!",
+    returnPolicy: "Returns accepted within 7 days with receipt.",
+    showQR: false,
+    hideEmailWebsite: true
   },
   posSettings: {
     defaultTaxRate: 0,
@@ -101,6 +102,8 @@ const useSettingsStore = create((set, get) => ({
     const sanitizedSettings = Object.entries(settings).reduce((acc, [key, value]) => {
       if (key === 'defaultTaxRate') {
         acc[key] = parseFloat(value) || 0;
+      } else if (key === 'hideEmailWebsite') {
+        acc[key] = Boolean(value);
       } else {
         acc[key] = typeof value === 'function' ? value.toString() : value;
       }

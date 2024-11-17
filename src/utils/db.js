@@ -59,6 +59,7 @@ export const initDB = async () => {
               case STORES.CUSTOMERS:
                 store.createIndex('phone', 'phone', { unique: true });
                 store.createIndex('name', 'name');
+                store.createIndex('cnic', 'cnic', { unique: true });
                 break;
               case STORES.USERS:
                 store.createIndex('username', 'username', { unique: true });

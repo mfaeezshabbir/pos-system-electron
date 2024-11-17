@@ -1,5 +1,23 @@
 import { create } from 'zustand'
 import { dbOperations, STORES } from '../utils/db'
+import useTransactionStore from './useTransactionStore'
+
+// Move helper functions to the top of the file
+const validateCNIC = (cnic) => {
+  if (!cnic) return true;
+  const cnicRegex = /^\d{5}-\d{7}-\d{1}$/;
+  return cnicRegex.test(cnic);
+};
+
+const validateCustomer = (customer) => {
+  const errors = [];
+  if (!customer.name) errors.push('Name is required');
+  if (!customer.phone) errors.push('Phone is required');
+  if (customer.cnic && !validateCNIC(customer.cnic)) {
+    errors.push('Invalid CNIC format (e.g., 12345-1234567-1)');
+  }
+  return errors;
+};
 
 const useCustomerStore = create((set, get) => ({
   customers: [],
@@ -18,28 +36,40 @@ const useCustomerStore = create((set, get) => ({
   },
 
   addCustomer: async (customer) => {
-    set({ loading: true })
+    set({ loading: true });
     try {
-      const newCustomer = {
-        id: Date.now().toString(),
-        name: customer.name,
-        phone: customer.phone,
-        creditLimit: 0,
-        currentCredit: 0,
-        transactions: [],
-        createdAt: new Date().toISOString()
+      console.log('Validating customer:', customer);
+      const errors = validateCustomer(customer);
+      if (errors.length > 0) {
+        console.error('Validation errors:', errors);
+        set({ error: errors.join(', '), loading: false });
+        return null;
       }
+
+      const newCustomer = {
+        ...customer,
+        id: Date.now().toString(),
+        creditLimit: customer.creditLimit || 0,
+        currentCredit: customer.currentCredit || 0,
+        transactions: customer.transactions || [],
+        createdAt: new Date().toISOString()
+      };
+
+      console.log('Attempting to add customer:', newCustomer);
+      await dbOperations.add(STORES.CUSTOMERS, newCustomer);
       
-      await dbOperations.add(STORES.CUSTOMERS, newCustomer)
       set(state => ({
         customers: [...state.customers, newCustomer],
         loading: false,
         error: null
-      }))
-      return newCustomer
+      }));
+      
+      console.log('Customer added successfully:', newCustomer);
+      return newCustomer;
     } catch (error) {
-      set({ error: error.message, loading: false })
-      return null
+      console.error('Failed to add customer:', error);
+      set({ error: error.message, loading: false });
+      return null;
     }
   },
 
@@ -49,7 +79,7 @@ const useCustomerStore = create((set, get) => ({
       const customer = await dbOperations.get(STORES.CUSTOMERS, id)
       const updatedCustomer = { ...customer, ...updates }
       await dbOperations.put(STORES.CUSTOMERS, updatedCustomer)
-      
+
       set(state => ({
         customers: state.customers.map(c => c.id === id ? updatedCustomer : c),
         loading: false,
@@ -105,7 +135,7 @@ const useCustomerStore = create((set, get) => ({
       )
 
       const history = {
-        transactions: transactions.sort((a, b) => 
+        transactions: transactions.sort((a, b) =>
           new Date(b.timestamp) - new Date(a.timestamp)
         ),
         analytics: {
@@ -115,10 +145,10 @@ const useCustomerStore = create((set, get) => ({
           totalUnpaid: transactions
             .filter(t => t.status !== 'completed' && t.paymentMethod === 'khata')
             .reduce((sum, t) => sum + t.total, 0),
-          averageTransaction: transactions.length ? 
+          averageTransaction: transactions.length ?
             transactions.reduce((sum, t) => sum + t.total, 0) / transactions.length : 0,
           totalVisits: transactions.length,
-          lastVisit: transactions.length ? 
+          lastVisit: transactions.length ?
             transactions[0].timestamp : null,
           frequentItems: getFrequentItems(transactions),
           paymentMethods: getPaymentMethodStats(transactions)
@@ -139,8 +169,8 @@ const useCustomerStore = create((set, get) => ({
       if (!customer) return false
 
       const currentPoints = customer.loyaltyPoints || 0
-      const updatedPoints = type === 'add' ? 
-        currentPoints + points : 
+      const updatedPoints = type === 'add' ?
+        currentPoints + points :
         currentPoints - points
 
       const updatedCustomer = {
@@ -273,12 +303,12 @@ const useCustomerStore = create((set, get) => ({
 
       const updatedCustomer = {
         ...customer,
-        currentCredit: isPaid ? 
-          customer.currentCredit - transaction.total : 
+        currentCredit: isPaid ?
+          customer.currentCredit - transaction.total :
           customer.currentCredit + transaction.total,
-        transactions: customer.transactions.map(t => 
-          t.id === transactionId ? 
-            { ...t, status: isPaid ? 'paid' : 'unpaid', isPaid } : 
+        transactions: customer.transactions.map(t =>
+          t.id === transactionId ?
+            { ...t, status: isPaid ? 'completed' : 'unpaid', isPaid } :
             t
         )
       };
@@ -289,6 +319,7 @@ const useCustomerStore = create((set, get) => ({
           c.id === customerId ? updatedCustomer : c
         )
       }));
+
       return true;
     } catch (error) {
       console.error('Failed to update payment status:', error);

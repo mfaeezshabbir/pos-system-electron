@@ -103,7 +103,12 @@ const useTransactionStore = create((set, get) => ({
     clearAllTransactions: async () => {
         try {
             set({ loading: true });
-            await dbOperations.clearStore(STORES.TRANSACTIONS);
+            // Get all transactions
+            const transactions = await dbOperations.getAll(STORES.TRANSACTIONS);
+            // Delete each transaction individually
+            for (const transaction of transactions) {
+                await dbOperations.delete(STORES.TRANSACTIONS, transaction.id);
+            }
             set({ transactions: [], loading: false });
             return true;
         } catch (error) {
@@ -115,30 +120,31 @@ const useTransactionStore = create((set, get) => ({
 
     updateTransactionStatus: async (transactionId, newStatus) => {
         try {
-            const transaction = await dbOperations.get(STORES.TRANSACTIONS, transactionId);
-            if (!transaction) return false;
+            if (!transactionId) {
+                console.error('Transaction ID is required');
+                return false;
+            }
+
+            const stringId = transactionId.toString();
+            const transaction = await dbOperations.get(STORES.TRANSACTIONS, stringId);
+            
+            if (!transaction) {
+                console.error('Transaction not found:', stringId);
+                return false;
+            }
 
             const updatedTransaction = {
                 ...transaction,
-                status: newStatus
+                status: newStatus,
+                isPaid: newStatus === 'completed'
             };
 
             await dbOperations.put(STORES.TRANSACTIONS, updatedTransaction);
-
             set(state => ({
                 transactions: state.transactions.map(t =>
-                    t.id === transactionId ? updatedTransaction : t
+                    t.id === stringId ? updatedTransaction : t
                 )
             }));
-
-            if (transaction.paymentMethod === 'khata' && transaction.customer?.id) {
-                const customerStore = useCustomerStore.getState();
-                await customerStore.updateTransactionPaymentStatus(
-                    transaction.customer.id,
-                    transactionId,
-                    newStatus === 'completed'
-                );
-            }
 
             return true;
         } catch (error) {

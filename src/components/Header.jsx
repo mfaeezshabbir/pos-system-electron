@@ -27,7 +27,7 @@ import { useNavigate } from "react-router-dom";
 const Header = () => {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const { currentUser, logout } = useAuthStore();
-  const { systemSettings, updateSystemSettings } = useSettingsStore();
+  const { systemSettings, updateSettings } = useSettingsStore();
   const navigate = useNavigate();
 
   const isAuthorizedForSettings =
@@ -59,18 +59,11 @@ const Header = () => {
 
   const toggleTheme = () => {
     const newTheme = systemSettings.theme === "light" ? "dark" : "light";
-    updateSystemSettings({
+    updateSettings('systemSettings', {
       ...systemSettings,
       theme: newTheme
     });
-    // Force a re-render by updating the body class
-    document.body.className = newTheme;
   };
-
-  // Set initial theme
-  React.useEffect(() => {
-    document.body.className = systemSettings.theme;
-  }, [systemSettings.theme]);
 
   return (
     <AppBar 

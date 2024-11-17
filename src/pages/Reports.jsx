@@ -31,9 +31,6 @@ import {
   DeleteForever,
   CheckCircle,
   Payment,
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
 } from "@mui/icons-material";
 import dayjs from "dayjs";
 import useTransactionStore from "../stores/useTransactionStore";
@@ -43,7 +40,9 @@ import { generatePDF, generateReceipt } from "../utils/pdfGenerator";
 import useDashboardStore from "../stores/useDashboardStore";
 import useNotificationStore from "../stores/useNotificationStore";
 import ReceiptPreviewDialog from "../components/POS/ReceiptPreviewDialog";
-import useSettingsStore from '../stores/useSettingsStore';
+import useSettingsStore from "../stores/useSettingsStore";
+import { handleTransactionStatusUpdate } from "../utils/transactionHelpers";
+import useSyncStore from "../stores/useSyncStore";
 
 const Reports = () => {
   const [tab, setTab] = React.useState(0);
@@ -57,9 +56,7 @@ const Reports = () => {
   const [adjustmentQuantity, setAdjustmentQuantity] = React.useState(0);
   const [adjustmentReason, setAdjustmentReason] = React.useState("");
   const [selectedReceipt, setSelectedReceipt] = React.useState(null);
-  const [categoryDialogOpen, setCategoryDialogOpen] = React.useState(false);
-  const [selectedCategory, setSelectedCategory] = React.useState(null);
-  const [newCategoryName, setNewCategoryName] = React.useState("");
+  const [groupedTransactions, setGroupedTransactions] = React.useState({});
 
   const {
     getSalesSummary,
@@ -76,13 +73,15 @@ const Reports = () => {
     const init = async () => {
       await loadTransactions();
       const initialTransactions = useTransactionStore.getState().transactions;
-      filterAndSetTransactions(initialTransactions);
+      const grouped = filterAndSetTransactions(initialTransactions);
+      setGroupedTransactions(grouped);
     };
     init();
 
     const unsubscribe = useTransactionStore.subscribe((state, prevState) => {
       if (state.transactions !== prevState?.transactions) {
-        filterAndSetTransactions(state.transactions);
+        const grouped = filterAndSetTransactions(state.transactions);
+        setGroupedTransactions(grouped);
       }
     });
 
@@ -99,7 +98,17 @@ const Reports = () => {
           transactionDate.isSameOrBefore(endDate, "day")
         );
       });
+
+      // Group transactions by payment status
+      const grouped = filtered.reduce((acc, transaction) => {
+        const status = transaction.status;
+        acc[status] = acc[status] || [];
+        acc[status].push(transaction);
+        return acc;
+      }, {});
+
       setFilteredTransactions(filtered);
+      return grouped;
     },
     [startDate, endDate]
   );
@@ -138,16 +147,21 @@ const Reports = () => {
     if (confirmed) {
       const success = await clearAllTransactions();
       if (success) {
-        // Reset all dashboard stats
+        // Reset dashboard stats
         const dashboardStore = useDashboardStore.getState();
         await dashboardStore.resetDailyStats();
-        await dashboardStore.updateSalesTrends();
+        await dashboardStore.updateSalesData();
+
+        // Broadcast the update to other tabs
+        useSyncStore.getState().broadcastUpdate("TRANSACTION_UPDATE", {
+          action: "clear",
+        });
 
         // Clear local state
         setFilteredTransactions([]);
 
         // Show notification
-        useNotificationStore.getState().showNotification({
+        useNotificationStore.getState().addNotification({
           message: "All transactions have been cleared",
           type: "success",
         });
@@ -184,26 +198,27 @@ const Reports = () => {
   };
 
   const handleToggleStatus = async (transaction) => {
-    try {
-      if (transaction.paymentMethod !== "khata") return;
-
-      const newStatus =
-        transaction.status === "completed" ? "unpaid" : "completed";
-      const success = await useTransactionStore
-        .getState()
-        .updateTransactionStatus(transaction.id, newStatus);
-
-      if (success) {
-        useNotificationStore.getState().addNotification({
-          type: "success",
-          message: `Transaction marked as ${newStatus}`,
-        });
-      }
-    } catch (error) {
-      console.error("Error updating status:", error);
+    if (!transaction?.id) {
       useNotificationStore.getState().addNotification({
         type: "error",
-        message: "Failed to update status",
+        message: "Invalid transaction",
+      });
+      return;
+    }
+
+    const newStatus =
+      transaction.status === "completed" ? "unpaid" : "completed";
+    const success = await updateTransactionStatus(transaction.id, newStatus);
+
+    if (success) {
+      useNotificationStore.getState().addNotification({
+        type: "success",
+        message: `Transaction marked as ${newStatus}`,
+      });
+    } else {
+      useNotificationStore.getState().addNotification({
+        type: "error",
+        message: "Failed to update transaction status",
       });
     }
   };
@@ -214,67 +229,45 @@ const Reports = () => {
 
   const handlePrint = async (transaction) => {
     try {
+      if (!transaction) {
+        console.error("Transaction is undefined");
+        useNotificationStore.getState().addNotification({
+          type: "error",
+          message: "Invalid transaction data",
+        });
+        return;
+      }
+
       const { receiptSettings } = useSettingsStore.getState();
-      
-      // Use business details from transaction
+
+      // Use business details from transaction with safe access
       const enrichedTransaction = {
         ...transaction,
-        items: transaction.items || [],
-        timestamp: new Date(transaction.timestamp),
-        businessName: transaction.businessDetails.name,
-        businessAddress: transaction.businessDetails.address,
-        businessPhone: transaction.businessDetails.phone,
-        businessEmail: transaction.businessDetails.email,
-        businessWebsite: transaction.businessDetails.website,
-        businessTaxId: transaction.businessDetails.taxId
+        items: transaction?.items || [],
+        timestamp: transaction?.timestamp
+          ? new Date(transaction.timestamp)
+          : new Date(),
+        businessName: transaction?.businessDetails?.name || "Business Name",
+        businessAddress: transaction?.businessDetails?.address || "",
+        businessPhone: transaction?.businessDetails?.phone || "",
+        businessEmail: transaction?.businessDetails?.email || "",
+        businessWebsite: transaction?.businessDetails?.website || "",
+        businessTaxId: transaction?.businessDetails?.taxId || "",
       };
 
       const doc = generateReceipt(enrichedTransaction, receiptSettings);
-      const fileName = `Receipt-${transaction.id}.pdf`;
+      const fileName = `Receipt-${transaction?.id || Date.now()}.pdf`;
       doc.save(fileName);
 
       useNotificationStore.getState().addNotification({
-        type: 'success',
-        message: 'Receipt generated successfully'
+        type: "success",
+        message: "Receipt generated successfully",
       });
     } catch (error) {
-      console.error('Error printing receipt:', error);
+      console.error("Error printing receipt:", error);
       useNotificationStore.getState().addNotification({
-        type: 'error',
-        message: 'Failed to generate receipt'
-      });
-    }
-  };
-
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    
-    const success = await useInventoryStore.getState().addCategory(newCategoryName.trim());
-    
-    if (success) {
-      const settings = await dbOperations.get(STORES.SETTINGS, 'appSettings');
-      setCategories(settings?.categories || []);
-      setNewCategoryName("");
-      setCategoryDialogOpen(false);
-      useNotificationStore.getState().addNotification({
-        type: 'success',
-        message: 'Category added successfully'
-      });
-    }
-  };
-
-  const handleDeleteCategory = async (category) => {
-    const confirmed = window.confirm(`Are you sure you want to delete "${category}"?`);
-    if (!confirmed) return;
-
-    const success = await useInventoryStore.getState().deleteCategory(category);
-    
-    if (success) {
-      const settings = await dbOperations.get(STORES.SETTINGS, 'appSettings');
-      setCategories(settings?.categories || []);
-      useNotificationStore.getState().addNotification({
-        type: 'success',
-        message: 'Category deleted successfully'
+        type: "error",
+        message: "Failed to generate receipt",
       });
     }
   };
@@ -443,8 +436,40 @@ const Reports = () => {
           </TableContainer>
         </Paper>
       </Grid>
+
+      <PaymentStatusSummary />
     </Grid>
   );
+
+  const PaymentStatusSummary = () => {
+    return (
+      <Grid item xs={12}>
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Payment Status Summary
+          </Typography>
+          <Stack direction="row" spacing={3}>
+            <Box>
+              <Typography variant="subtitle2" color="success.main">
+                Paid Transactions
+              </Typography>
+              <Typography variant="h4">
+                {groupedTransactions.completed?.length || 0}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" color="warning.main">
+                Pending Payments
+              </Typography>
+              <Typography variant="h4">
+                {groupedTransactions.unpaid?.length || 0}
+              </Typography>
+            </Box>
+          </Stack>
+        </Paper>
+      </Grid>
+    );
+  };
 
   const renderInventoryReport = () => (
     <Grid container spacing={3}>
@@ -543,56 +568,6 @@ const Reports = () => {
     </Grid>
   );
 
-  const renderCategoriesReport = () => (
-    <Grid container spacing={3}>
-      <Grid item xs={12}>
-        <Paper sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-            <Typography variant="h6">Categories Management</Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setCategoryDialogOpen(true)}
-            >
-              Add Category
-            </Button>
-          </Box>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Category Name</TableCell>
-                  <TableCell>Product Count</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {categories.map((category) => (
-                  <TableRow key={category}>
-                    <TableCell>{category}</TableCell>
-                    <TableCell>
-                      {products.filter(p => p.category === category).length}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => handleDeleteCategory(category)}
-                        startIcon={<DeleteIcon />}
-                      >
-                        Delete
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      </Grid>
-    </Grid>
-  );
-
   const StockAdjustmentDialog = () => (
     <Dialog
       open={stockAdjustmentDialog.open}
@@ -640,33 +615,6 @@ const Reports = () => {
           }
         >
           Adjust Stock
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-
-  const CategoryDialog = () => (
-    <Dialog
-      open={categoryDialogOpen}
-      onClose={() => setCategoryDialogOpen(false)}
-      maxWidth="xs"
-      fullWidth
-    >
-      <DialogTitle>Add New Category</DialogTitle>
-      <DialogContent>
-        <TextField
-          autoFocus
-          margin="dense"
-          label="Category Name"
-          fullWidth
-          value={newCategoryName}
-          onChange={(e) => setNewCategoryName(e.target.value)}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
-        <Button onClick={handleAddCategory} variant="contained">
-          Add Category
         </Button>
       </DialogActions>
     </Dialog>
@@ -728,12 +676,9 @@ const Reports = () => {
       >
         <Tab label="Sales Report" />
         <Tab label="Inventory Report" />
-        <Tab label="Categories" />
       </Tabs>
 
-      {tab === 0 && renderSalesReport()}
-      {tab === 1 && renderInventoryReport()}
-      {tab === 2 && renderCategoriesReport()}
+      {tab === 0 ? renderSalesReport() : renderInventoryReport()}
 
       <StockAdjustmentDialog />
 
@@ -743,8 +688,6 @@ const Reports = () => {
         transaction={selectedReceipt}
         onPrint={handlePrint}
       />
-
-      <CategoryDialog />
     </Box>
   );
 };

@@ -7,12 +7,9 @@ import {
   Typography,
   Alert,
   Container,
-  Drawer,
-  IconButton,
-  useTheme,
-  useMediaQuery,
+  Stack,
 } from "@mui/material";
-import { Person, ShoppingCart, Menu } from "@mui/icons-material";
+import { Person, ShoppingCart } from "@mui/icons-material";
 import ProductGrid from "../components/POS/ProductGrid";
 import Cart from "../components/POS/Cart";
 import useCartStore from "../stores/useCartStore";
@@ -22,10 +19,6 @@ import useNotificationStore from "../stores/useNotificationStore";
 import useSettingsStore from "../stores/useSettingsStore";
 
 const Pos = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
-
   const DEFAULT_WALK_IN_CUSTOMER = {
     id: "walk-in",
     name: "Walk-in Customer",
@@ -96,52 +89,97 @@ const Pos = () => {
     }
 
     addItem(product);
-    if (isMobile) {
-      setDrawerOpen(true);
-    }
   };
 
   const CustomerSelection = () => (
-    <Container maxWidth="sm" sx={{ textAlign: "center", py: 4 }}>
-      <Typography variant="h5" gutterBottom>
-        Welcome to POS System
-      </Typography>
-      <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-        Please select a customer to continue
-      </Typography>
-      <Box sx={{ display: "flex", gap: 2, justifyContent: "center", mt: 3 }}>
-        <Button
-          variant="contained"
-          startIcon={<Person />}
-          onClick={() => setCustomerDialogOpen(true)}
-          size="large"
-        >
-          Select Customer
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<ShoppingCart />}
-          onClick={handleWalkInCustomer}
-          size="large"
-        >
-          Walk-in Customer
-        </Button>
-      </Box>
-    </Container>
+    <Box
+      sx={{
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        bgcolor: "background.paper",
+        borderRadius: 3,
+        p: 4,
+      }}
+    >
+      <Paper
+        elevation={0}
+        sx={{
+          p: 4,
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+          maxWidth: 500,
+          width: "100%",
+        }}
+      >
+        <Stack spacing={3} alignItems="center">
+          <Typography variant="h4" fontWeight="700">
+            Welcome Back
+          </Typography>
+          <Typography variant="body1" color="text.secondary" textAlign="center">
+            To begin a new transaction, please select a customer or proceed with
+            a walk-in sale
+          </Typography>
+          <Stack direction="row" spacing={2} width="100%">
+            <Button
+              fullWidth
+              variant="contained"
+              size="large"
+              startIcon={<Person />}
+              onClick={() => setCustomerDialogOpen(true)}
+              sx={{
+                borderRadius: 2,
+                py: 1.5,
+              }}
+            >
+              Select Customer
+            </Button>
+            <Button
+              fullWidth
+              variant="outlined"
+              size="large"
+              startIcon={<ShoppingCart />}
+              onClick={handleWalkInCustomer}
+              sx={{
+                borderRadius: 2,
+                py: 1.5,
+              }}
+            >
+              Quick Sale
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+    </Box>
   );
 
   const CartComponent = () => (
-    <Cart
-      items={items}
-      onUpdateQuantity={updateItemQuantity}
-      onRemoveItem={removeItem}
-    />
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <Cart
+        items={items}
+        onUpdateQuantity={updateItemQuantity}
+        onRemoveItem={removeItem}
+      />
+    </Box>
   );
 
   return (
-    <Box sx={{ height: "calc(100vh - 64px)", bgcolor: "background.default" }}>
+    <Box
+      sx={{
+        height: "calc(100vh - 64px)",
+        bgcolor: "background.default",
+      }}
+    >
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert
+          severity="error"
+          sx={{
+            mb: 2,
+            borderRadius: 2,
+          }}
+        >
           {error}
         </Alert>
       )}
@@ -150,19 +188,18 @@ const Pos = () => {
         <CustomerSelection />
       ) : (
         <Box sx={{ height: "100%", position: "relative" }}>
-          {isMobile && (
-            <IconButton
-              sx={{ position: "fixed", bottom: 16, right: 16, zIndex: 1000 }}
-              color="primary"
-              onClick={() => setDrawerOpen(true)}
-            >
-              <ShoppingCart />
-            </IconButton>
-          )}
-
-          <Grid container spacing={2} sx={{ height: "100%", p: 2 }}>
-            <Grid item xs={12} md={8}>
-              <Paper sx={{ height: "100%", overflow: "hidden" }}>
+          <Grid container spacing={3} sx={{ height: "100%" }}>
+            <Grid item xs={8}>
+              <Paper
+                elevation={0}
+                sx={{
+                  height: "100%",
+                  overflow: "hidden",
+                  borderRadius: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
                 <ProductGrid
                   onProductSelect={handleProductSelect}
                   disabled={!customer}
@@ -170,30 +207,21 @@ const Pos = () => {
               </Paper>
             </Grid>
 
-            {!isMobile && (
-              <Grid item md={4}>
-                <Paper sx={{ height: "100%", overflow: "hidden" }}>
-                  <CartComponent />
-                </Paper>
-              </Grid>
-            )}
+            <Grid item xs={4}>
+              <Paper
+                elevation={0}
+                sx={{
+                  height: "100%",
+                  overflow: "hidden",
+                  borderRadius: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <CartComponent />
+              </Paper>
+            </Grid>
           </Grid>
-
-          {isMobile && (
-            <Drawer
-              anchor="right"
-              open={drawerOpen}
-              onClose={() => setDrawerOpen(false)}
-              sx={{
-                "& .MuiDrawer-paper": {
-                  width: "85%",
-                  maxWidth: 400,
-                },
-              }}
-            >
-              <CartComponent />
-            </Drawer>
-          )}
         </Box>
       )}
 

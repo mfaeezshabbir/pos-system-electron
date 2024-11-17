@@ -19,12 +19,12 @@ const PosSettings = () => {
   const isAdmin = currentUser?.role === ROLES.ADMIN;
 
   const handleChange = (setting, value) => {
-    if (setting === 'defaultTaxRate') {
+    if (setting === "defaultTaxRate") {
       const numValue = parseFloat(value) || 0;
       const validValue = Math.min(Math.max(0, numValue), 100);
-      updateSettings('posSettings', { [setting]: validValue });
+      updateSettings("posSettings", { [setting]: validValue });
     } else {
-      updateSettings('posSettings', { [setting]: value });
+      updateSettings("posSettings", { [setting]: value });
     }
   };
 
@@ -50,9 +50,7 @@ const PosSettings = () => {
             label="Default Tax Rate (%)"
             type="number"
             value={posSettings.defaultTaxRate}
-            onChange={(e) =>
-              handleChange("defaultTaxRate", e.target.value)
-            }
+            onChange={(e) => handleChange("defaultTaxRate", e.target.value)}
             fullWidth
             inputProps={{
               min: 0,

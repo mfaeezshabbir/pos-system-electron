@@ -18,10 +18,39 @@ const useCartStore = create((set, get) => ({
 
   // Initialize cart
   initializeCart: async () => {
-    const cart = await dbOperations.get(STORES.SETTINGS, 'currentCart')
-    if (cart) {
-      set(cart)
+    const cart = await dbOperations.get(STORES.SETTINGS, "currentCart");
+
+    // Check if cart exists and has valid items
+    if (cart && cart.items && Array.isArray(cart.items) && cart.items.length > 0) {
+      // Verify if the cart is from the same day
+      const cartDate = new Date(cart.timestamp || 0)
+      const today = new Date()
+
+      if (cartDate.toDateString() === today.toDateString()) {
+        set(cart)
+        return
+      }
     }
+
+    // If no valid cart exists or it's from a different day, start with empty cart
+    await dbOperations.put(STORES.SETTINGS, {
+      id: 'currentCart',
+      items: [],
+      customer: null,
+      discount: 0,
+      tax: 0,
+      onHold: false,
+      timestamp: new Date().toISOString()
+    })
+
+    set({
+      items: [],
+      customer: null,
+      discount: 0,
+      tax: 0,
+      error: null,
+      onHold: false
+    })
   },
 
   // Save cart state
@@ -33,7 +62,8 @@ const useCartStore = create((set, get) => ({
       customer: state.customer,
       discount: state.discount,
       tax: state.tax,
-      onHold: state.onHold
+      onHold: state.onHold,
+      timestamp: new Date().toISOString()
     })
   },
 
@@ -144,7 +174,7 @@ const useCartStore = create((set, get) => ({
     const subtotal = state.items.reduce((sum, item) => {
       return sum + (item.price * item.quantity || 0);
     }, 0);
-    
+
     const discountAmount = (subtotal * (state.discount || 0)) / 100;
     const taxableAmount = subtotal - discountAmount;
     // Ensure tax rate is a number and within valid range
@@ -169,7 +199,7 @@ const useCartStore = create((set, get) => ({
       const inventoryStore = useInventoryStore.getState();
       const transactionStore = useTransactionStore.getState();
       const { businessInfo } = useSettingsStore.getState();
-      
+
       // Calculate total
       const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
       const totalAmount = subtotal + tax - (discount || 0);
@@ -182,7 +212,7 @@ const useCartStore = create((set, get) => ({
           'Sale transaction',
           'sale'
         );
-        
+
         if (!success) {
           throw new Error(`Failed to update stock for ${item.name}`);
         }
@@ -221,7 +251,7 @@ const useCartStore = create((set, get) => ({
 
       // Add transaction to store
       await transactionStore.addTransaction(transaction);
-      
+
       // Clear the cart after successful transaction
       await get().clearCart();
 
@@ -268,18 +298,10 @@ const useCartStore = create((set, get) => ({
       return false
     }
 
-    const totals = state.getCartTotals()
-    const customer = useCustomerStore.getState().getCustomer(state.customer.id)
-
-    if (customer.currentCredit + totals.total > customer.creditLimit) {
-      set({ error: 'Credit limit exceeded' })
-      return false
-    }
-
     const holdTransaction = {
       id: Date.now().toString(),
       items: state.items,
-      total: totals.total,
+      total: state.getCartTotals().total,
       timestamp: new Date().toISOString(),
       status: 'on_hold'
     }
