@@ -19,6 +19,7 @@ import {
   Settings,
   Person,
   People,
+  ExitToApp,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import useSettingsStore from "../stores/useSettingsStore";
@@ -77,6 +78,11 @@ const Sidebar = () => {
     item.roles.includes(currentUser?.role)
   );
 
+  const handleExit = () => {
+    window.Electron?.removeAllListeners("navigate");
+    window.close();
+  };
+
   return (
     <Drawer
       variant="permanent"
@@ -86,6 +92,8 @@ const Sidebar = () => {
         "& .MuiDrawer-paper": {
           width: DRAWER_WIDTH,
           boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
         },
       }}
     >
@@ -137,7 +145,7 @@ const Sidebar = () => {
 
       <Divider />
 
-      <List>
+      <List sx={{ flex: 1 }}>
         {filteredMenuItems.map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton
@@ -161,6 +169,19 @@ const Sidebar = () => {
             </ListItemButton>
           </ListItem>
         ))}
+      </List>
+
+      <Divider />
+
+      <List>
+        <ListItem disablePadding>
+          <ListItemButton onClick={handleExit}>
+            <ListItemIcon>
+              <ExitToApp />
+            </ListItemIcon>
+            <ListItemText primary="Exit Application" />
+          </ListItemButton>
+        </ListItem>
       </List>
     </Drawer>
   );

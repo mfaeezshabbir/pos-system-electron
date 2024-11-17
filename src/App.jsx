@@ -79,12 +79,33 @@ function App() {
     }
   }, []);
 
+  React.useEffect(() => {
+    window.Electron?.on("navigate", (path) => {
+      Navigate(path);
+    });
+
+    return () => {
+      window.electron?.removeAllListeners("navigate");
+    };
+  }, []);
+
   if (error) {
     return <div>Error initializing app: {error.message}</div>;
   }
 
   if (!isInitialized) {
-    return <div>Loading...</div>;
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          height: '100vh',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (

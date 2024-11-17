@@ -11,17 +11,20 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electron', {
   // Printer operations
   printReceipt: (receiptData) => ipcRenderer.invoke('print-receipt', receiptData),
-  
+
   // Data operations
   backupData: () => ipcRenderer.invoke('backup-data'),
   restoreData: (backupData) => ipcRenderer.invoke('restore-data', backupData),
-  
+
   // System info
   getSystemInfo: () => ({
     platform: process.platform,
     version: process.version,
     versions: process.versions
-  })
+  }),
+
+  on: (channel, callback) => ipcRenderer.on(channel, (_, data) => callback(data)),
+  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
 })
 
 window.addEventListener('DOMContentLoaded', () => {
