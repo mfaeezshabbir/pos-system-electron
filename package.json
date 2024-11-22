@@ -22,7 +22,7 @@
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.12",
     "@mui/material": "^5.15.12",
-    "@mui/x-date-pickers": "^7.22.2",
+    "@mui/x-date-pickers": "^7.22.3",
     "date-fns": "^3.3.1",
     "dayjs": "^1.11.13",
     "electron-store": "^8.1.0",
